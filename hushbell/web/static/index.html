@@ -29,8 +29,8 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;fl
 .chip.bad::before{content:"● ";color:var(--urgent)}
 button.mini{font-size:12px;padding:3px 10px;border-radius:999px}
 .action label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}
-input.reply{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
-input.reply:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
+textarea.reply{display:block;width:100%;font:inherit;line-height:1.4;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);resize:vertical}
+textarea.reply:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .notice.ok{color:var(--ok)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 6px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
@@ -128,7 +128,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   function replyBox(it) {
     const value = drafts[it.id] ?? it.reply_text;
     return `<div class="action"><label for="r-${esc(it.id)}">Reply that will be sent in ${esc(it.app)}. You can change it.</label>
-      <input class="reply" id="r-${esc(it.id)}" data-reply-for="${esc(it.id)}" maxlength="300" value="${esc(value)}"></div>`;
+      <textarea class="reply" id="r-${esc(it.id)}" data-reply-for="${esc(it.id)}" maxlength="300" rows="2">${esc(value)}</textarea></div>`;
   }
   function approveLabel(it) {
     if (it.action_type === "reply") return "Send reply";

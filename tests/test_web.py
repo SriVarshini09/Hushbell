@@ -43,6 +43,24 @@ def test_the_call_reads_the_summary_and_takes_a_keypress(make_engine):
     assert engine.store.get_item(item_id).status == "done"
 
 
+def test_forms_cannot_be_approved_by_keypress(make_engine):
+    """A link can't be checked by ear, so pressing 1 on a call never opens one."""
+    engine = make_engine(FakeVoice())
+    client = TestClient(create_app(engine))
+    item_id = client.post("/api/ingest", json=FEVER, headers=AUTH).json()["item_id"]
+    engine.store.update_item(item_id, action_type="open_link", url="https://forms.gle/x", reply_text="")
+
+    assert "Open your Hushbell page" in client.post(f"/twilio/voice/{item_id}", data={}).text
+    heard = client.post(f"/twilio/gather/{item_id}", data={"Digits": "1"}).text
+    assert "approved on your Hushbell page" in heard
+    assert engine.store.get_item(item_id).status == "calling" and engine.phone.goals == []
+
+    engine.call_status(item_id, "completed")                 # the call ends; the card is still there
+    assert engine.store.get_item(item_id).status == "waiting"
+    assert client.post(f"/api/items/{item_id}/approve", headers=AUTH).json() == {"ok": True}
+    assert "https://forms.gle/x" in engine.phone.goals[0]
+
+
 def test_twilio_requests_must_be_signed(make_engine, settings):
     settings.twilio_validate = True
     settings.twilio_auth_token = "secret"

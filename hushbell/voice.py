@@ -69,8 +69,15 @@ def _option_text(item: Item) -> str:
     if item.action_type == "reply" and item.reply_text:
         return f"Press 1 to reply: {item.reply_text}. Press 2 if you will handle it yourself."
     if item.action_type == "open_link":
-        return "Press 1 and I will fill in the form for you. Press 2 if you will handle it yourself."
+        # A form link can't be checked by ear, so it is approved on the page, where the link is visible.
+        return ("It comes with a form. Open your Hushbell page to see the link and approve it. "
+                "Press 2 if you will handle it yourself.")
     return "Press 1 to mark this as seen. Press 2 if you will handle it yourself."
+
+
+def needs_page(item: Item | None, digit: str) -> bool:
+    """True when the parent pressed 1 for something that can only be approved on the page."""
+    return bool(item) and digit == "1" and item.action_type == "open_link"
 
 
 def call_script(item: Item) -> str:
@@ -108,14 +115,15 @@ def gather_twiml(digit: str, item: Item | None, base_url: str, accepted: bool) -
     elif digit not in ("1", "2"):
         response.redirect(f"{base_url}/twilio/voice/{item.id}?attempt=2", method="POST")
         return str(response)
+    elif needs_page(item, digit):
+        response.say("Forms are approved on your Hushbell page, where you can see the link. "
+                     "It is waiting for you there. Goodbye.")
     elif not accepted:
         response.say("This message was already handled. Goodbye.")
     elif digit == "2":
         response.say("Okay, you will handle it. I will not do anything. Goodbye.")
     elif item.action_type == "reply":
         response.say("Done. I am sending your reply now. Goodbye.")
-    elif item.action_type == "open_link":
-        response.say("Done. I am filling in the form now. Goodbye.")
     else:
         response.say("Marked as seen. Goodbye.")
     response.hangup()

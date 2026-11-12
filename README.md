@@ -17,6 +17,11 @@ Do Not Disturb:
 
 You never open a school app, and nothing is sent, signed or paid without your OK.
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="The Hushbell page on a phone: two cards waiting for the parent, with an editable reply and a form to approve" width="320">
+  <br><em>The Hushbell page on a phone, with example messages.</em>
+</p>
+
 ## How it works
 
 A 2-minute animated walkthrough is in [`docs/explainer.html`](docs/explainer.html) (download it and open it in a browser).
@@ -155,8 +160,13 @@ Forwarding apps (Tasker, MacroDroid) or scripts can also post messages to
   sorted, and urgent summaries are read to you by Twilio on the call.
 - **Personal messages are never read.** For apps like WhatsApp and Gmail, only notifications that
   mention your keywords are processed.
-- **Nothing happens without your OK.** Replies and forms run only after you press 1 or tap
-  Approve. The agent is told never to enter passwords or payment details and to stop if asked.
+- **Nothing happens without your OK.** Replies run only after you press 1 or tap the card, and
+  you can edit the wording first. Forms can only be approved on the page, where you can see the
+  link, never by keypress on a call. The agent is told never to enter passwords or payment
+  details and to stop if a form asks for them.
+- **The phone agent only gets a cleaned-up task.** The original message is never passed to it;
+  the sender's name and reply are stripped to one quoted line, and the task tells the agent to
+  ignore instructions it sees on screen.
 - **Only web links are opened**, and only after you approve them.
 - **The page is locked** with an access token (sign-in locks for 10 minutes after 8 wrong tries);
   Twilio webhooks are checked with Twilio's signature.

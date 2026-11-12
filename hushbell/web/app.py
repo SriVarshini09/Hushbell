@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from hushbell import __version__
 from hushbell.engine import Engine
 from hushbell.models import IncomingMessage
-from hushbell.voice import gather_twiml, ring_test_twiml, voice_twiml
+from hushbell.voice import gather_twiml, needs_page, ring_test_twiml, voice_twiml
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
@@ -201,7 +201,10 @@ def create_app(engine: Engine) -> FastAPI:
         digit = str(form.get("Digits", "")).strip()
         item = engine.store.get_item(item_id)
         accepted = False
-        if item and digit in ("1", "2"):
+        if needs_page(item, digit):
+            engine.store.add_event("call", "You pressed 1, but forms are approved on the page. Still waiting there",
+                                   item_id)
+        elif item and digit in ("1", "2"):
             accepted = engine.resume(item_id, digit == "1", "call")
         return Response(gather_twiml(digit, item, settings.public_base_url, accepted), media_type="application/xml")
 
