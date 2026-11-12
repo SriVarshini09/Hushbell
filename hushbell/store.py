@@ -191,6 +191,21 @@ class Store:
                                    [(fp, now) for fp in fingerprints])
             self._conn.commit()
 
+    def forget_seen(self, fingerprints: list[str]) -> None:
+        if not fingerprints:
+            return
+        with self._lock:
+            self._conn.executemany("DELETE FROM seen WHERE fp = ?", [(fp,) for fp in fingerprints])
+            self._conn.commit()
+
+    def clear_history(self) -> None:
+        """Remove every item, message and log line. Settings and seen notifications are kept."""
+        with self._lock:
+            self._conn.execute("DELETE FROM items")
+            self._conn.execute("DELETE FROM messages")
+            self._conn.execute("DELETE FROM events")
+            self._conn.commit()
+
     # ---- small key/value settings -----------------------------------------
 
     def get_kv(self, key: str, default: str = "") -> str:

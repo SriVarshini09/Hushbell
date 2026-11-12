@@ -47,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     send.add_argument("--sender", default="Ms. Rivera · Room 12")
 
     sub.add_parser("token", help="print the access token for the Hushbell page")
+    sub.add_parser("reset", help="clear all messages and the activity log, to start a rehearsal over")
 
     args = parser.parse_args(argv)
     # School messages can contain emoji that some Windows terminals can't print. Never crash on them.
@@ -74,6 +75,15 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_send(settings, args)
     if args.command == "token":
         print(settings.access_token)
+        return 0
+    if args.command == "reset":
+        from hushbell.store import Store
+
+        store = Store(settings.db_path)
+        store.clear_history()
+        store.add_event("start over", "All messages cleared. Ready for a fresh run")
+        store.close()
+        print("Cleared all messages and the activity log. Your settings are unchanged.")
         return 0
     return 1
 

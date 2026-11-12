@@ -21,14 +21,18 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 COOKIE = "hushbell_session"
 
-DEMO_MESSAGES = [
-    {"app": "Remind", "sender": "Ms. Rivera · Room 12", "text": "Bake sale Friday! Bring cookies."},
-    {"app": "Remind", "sender": "Ms. Rivera · Room 12",
-     "text": "Field trip form due TODAY: https://forms.gle/fieldtrip12"},
-    {"app": "WhatsApp", "sender": "3rd grade parents", "text": "Jen: Reminder: field trip form due today!"},
-    {"app": "Remind", "sender": "Ms. Rivera · Room 12",
-     "text": "Maya has a fever (101°F). Please pick her up by 1pm."},
-]
+def demo_messages(children: list[str]) -> list[dict]:
+    """Four example school messages, about the family's own child so they read as real."""
+    child = (children[0].strip() if children and children[0].strip() else "Maya")
+    child = child[:1].upper() + child[1:]
+    teacher = "Ms. Rivera · Room 12"
+    return [
+        {"app": "Remind", "sender": teacher, "text": "Bake sale Friday! Bring cookies."},
+        {"app": "Remind", "sender": teacher, "text": "Field trip form due TODAY: https://forms.gle/fieldtrip12"},
+        {"app": "WhatsApp", "sender": "3rd grade parents", "text": "Jen: Reminder: field trip form due today!"},
+        {"app": "Remind", "sender": teacher,
+         "text": f"{child} has a fever (101°F) and needs to be picked up by 1pm."},
+    ]
 
 
 class IngestBody(BaseModel):
@@ -176,14 +180,24 @@ def create_app(engine: Engine) -> FastAPI:
         item, is_new = engine.ingest(IncomingMessage(app=body.app, sender=body.sender, text=body.text, source="api"))
         return {"ok": True, "item_id": item.id, "new": is_new}
 
+    @app.post("/api/demo/reset")
+    def demo_reset(request: Request):
+        """Clear every message so a rehearsal can be run again from the start."""
+        require(request)
+        if not settings.demo_mode:
+            raise HTTPException(status_code=404, detail="Demo mode is off (set HUSHBELL_DEMO=1).")
+        engine.reset()
+        return {"ok": True}
+
     @app.post("/api/demo/{index}")
     def demo(index: int, request: Request):
         require(request)
         if not settings.demo_mode:
             raise HTTPException(status_code=404, detail="Demo mode is off (set HUSHBELL_DEMO=1).")
-        if not 0 <= index < len(DEMO_MESSAGES):
+        messages = demo_messages(settings.children)
+        if not 0 <= index < len(messages):
             raise HTTPException(status_code=404, detail="No such demo message.")
-        msg = DEMO_MESSAGES[index]
+        msg = messages[index]
         item, is_new = engine.ingest(IncomingMessage(**msg, source="demo"))
         return {"ok": True, "item_id": item.id, "new": is_new}
 

@@ -142,6 +142,9 @@ def to_message(record: RawNotification, settings: Settings) -> IncomingMessage |
                            key=record.fingerprint, source="phone")
 
 
+FORGET_AFTER_POLLS = 3
+
+
 class AdbNotificationSource:
     """Polls the phone and returns school messages it has not seen before."""
 
@@ -155,6 +158,7 @@ class AdbNotificationSource:
         ran_before = bool(store and store.get_kv("phone_primed") == "1")
         # On the very first run, the first poll only marks what's already on the phone.
         self._primed = settings.backfill or ran_before
+        self._absent: dict[str, int] = {}
 
     def adb_args(self, *args: str) -> list[str]:
         cmd = [self.settings.adb_path]
@@ -186,11 +190,34 @@ class AdbNotificationSource:
             message = to_message(record, self.settings)
             if message and self._primed:
                 fresh.append(message)
+        gone = self._forget_cleared({r.fingerprint for r in records})
         if self.store:
             self.store.mark_seen(new_fingerprints)
+            self.store.forget_seen(gone)
         if not self._primed:
             self._primed = True
             if self.store:
                 self.store.set_kv("phone_primed", "1")
             log.info("Phone connected. Skipped %d notifications that were already there.", len(records))
         return fresh
+
+    def _forget_cleared(self, present: set[str]) -> list[str]:
+        """Forget notifications that have been gone from the phone for a few polls.
+
+        Once the parent clears a notification, the same words arriving again are a new
+        message (a teacher repeating herself, or a second demo run), not one already seen.
+        Waiting a few polls avoids treating a brief flicker as a new message.
+        """
+        gone: list[str] = []
+        for fingerprint in list(self._seen):
+            if fingerprint in present:
+                self._absent.pop(fingerprint, None)
+                continue
+            misses = self._absent.get(fingerprint, 0) + 1
+            if misses >= FORGET_AFTER_POLLS:
+                gone.append(fingerprint)
+                self._absent.pop(fingerprint, None)
+                self._seen.discard(fingerprint)
+            else:
+                self._absent[fingerprint] = misses
+        return gone

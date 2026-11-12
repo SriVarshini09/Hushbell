@@ -82,3 +82,17 @@ def test_messages_that_arrive_while_hushbell_is_off_are_picked_up(settings):
 def test_adb_command_uses_serial(settings):
     settings.adb_serial = "R58M123"
     assert AdbNotificationSource(settings).adb_args("shell", "x") == ["adb", "-s", "R58M123", "shell", "x"]
+
+
+def test_a_cleared_notification_can_arrive_again_as_new(settings):
+    """The teacher sends the same words twice (or a demo is rehearsed twice): the second one counts."""
+    outputs = [FIXTURE, "", FIXTURE, "", "", "", FIXTURE, FIXTURE]
+    settings.backfill = True
+    source = AdbNotificationSource(settings, runner=_runner(outputs))
+    assert len(source.poll()) == 3            # first sight
+    assert source.poll() == []                # gone for one poll...
+    assert source.poll() == []                # ...and back: a flicker, not a new message
+    for _ in range(3):
+        assert source.poll() == []            # cleared from the phone for three polls
+    assert len(source.poll()) == 3            # the same words again are new messages
+    assert source.poll() == []

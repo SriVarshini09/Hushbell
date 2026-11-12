@@ -126,7 +126,10 @@ Open the page on the laptop, or on your phone at `http://<laptop IP>:8000` (same
 your ngrok address. Everything works from a phone: the calls, the approval cards, and the log.
 
 Other commands: `hushbell notifications` (what the phone shows and what Hushbell would read;
-`--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`.
+`--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`, and
+`hushbell reset` (clear all messages to start over; in demo mode the page has a **Start over**
+button). The same words arriving twice within 12 hours are treated as one message, so start over
+between rehearsals.
 
 **If Hushbell stops and starts again**, nothing is lost: messages that arrived while it was off
 are picked up from the phone, cards waiting for your OK are still waiting, and anything that was

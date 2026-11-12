@@ -13,7 +13,9 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 
 1. `hushbell doctor --live` shows no problems.
 2. Press **Test call** on the page with Do Not Disturb on. The phone rings.
-3. Run the whole demo once, then clear the phone's notifications.
+3. Run the whole demo once. Then clear the phone's notifications and press **Start over** on the
+   page (start Hushbell with `--demo`, or run `hushbell reset`), or the repeated messages will be
+   merged into the rehearsal's.
 4. Have the backup video (`docs/explainer.html` or the recording) open in another tab.
 
 ## The script

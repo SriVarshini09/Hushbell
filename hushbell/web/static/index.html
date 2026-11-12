@@ -92,6 +92,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
       <button type="button" data-demo="1">Field trip form</button>
       <button type="button" data-demo="2">WhatsApp repost</button>
       <button type="button" data-demo="3">Fever</button>
+      <button type="button" data-reset="1">Start over</button>
     </div>
   </section>
 
@@ -243,6 +244,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
       delete drafts[t.dataset.approve];
     }
     else if (t.dataset.retry) post(`/api/items/${encodeURIComponent(t.dataset.retry)}/retry`, t.dataset.retry);
+    else if (t.dataset.reset) post("/api/demo/reset", null, null, "Cleared. Ready for a fresh run.");
     else if (t.dataset.testcall) post("/api/test-call", null, null, "Calling your phone now. It should ring even on Do Not Disturb.");
     else if (t.dataset.skip) post(`/api/items/${encodeURIComponent(t.dataset.skip)}/skip`, t.dataset.skip);
     else if (t.dataset.demo) post(`/api/demo/${t.dataset.demo}`);

@@ -170,6 +170,12 @@ class Engine:
         self.executor.submit(self._perform, item_id)
         return True
 
+    def reset(self) -> None:
+        """Start over: clear all messages and the log (used between demo rehearsals)."""
+        with self._ingest_lock:
+            self.store.clear_history()
+            self.store.add_event("start over", "All messages cleared. Ready for a fresh run")
+
     def recover(self) -> int:
         """After a restart, pick up anything that was in progress. Returns how many items were touched."""
         touched = 0

@@ -108,3 +108,27 @@ def test_demo_buttons_only_in_demo_mode(make_engine, settings):
     settings.demo_mode = True
     client = TestClient(create_app(make_engine()))
     assert client.post("/api/demo/0", headers=AUTH).json()["ok"] is True
+
+
+def test_demo_messages_are_about_the_familys_own_child(settings):
+    from hushbell.web.app import demo_messages
+
+    assert "Anna has a fever" in demo_messages(["anna"])[3]["text"]
+    assert "Maya has a fever" in demo_messages([])[3]["text"]
+
+
+def test_start_over_clears_everything_for_a_second_rehearsal(make_engine, settings):
+    settings.demo_mode = True
+    engine = make_engine()
+    client = TestClient(create_app(engine))
+    first = client.post("/api/demo/1", headers=AUTH).json()
+    assert client.post("/api/demo/1", headers=AUTH).json()["new"] is False      # a repeat joins the first
+    assert client.post("/api/demo/reset", headers=AUTH).json() == {"ok": True}
+    assert engine.state()["items"] == []
+    again = client.post("/api/demo/1", headers=AUTH).json()
+    assert again["new"] is True and again["item_id"] != first["item_id"]        # fresh after starting over
+
+
+def test_start_over_is_only_available_in_demo_mode(make_engine):
+    client = TestClient(create_app(make_engine()))
+    assert client.post("/api/demo/reset", headers=AUTH).status_code == 404
