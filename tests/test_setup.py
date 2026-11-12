@@ -49,6 +49,25 @@ def test_wizard_keeps_existing_answers_when_you_press_enter(tmp_path):
     assert values["HUSHBELL_CHILDREN"] == "Maya" and values["HUSHBELL_PARENT_NAME"] == "Ana Lopez"
 
 
+def test_wizard_saves_each_answer_right_away_and_confirms_hidden_ones(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("ANTHROPIC_API_KEY=\n", encoding="utf-8")
+    said = []
+
+    def stop_after_children(question):
+        if "children" in question:
+            return "Anna"
+        raise KeyboardInterrupt                                # the parent closes the terminal halfway
+
+    try:
+        run_wizard(env, ask=stop_after_children, ask_secret=lambda q: "sk-test-123", out=lambda *a: said.append(a[0]))
+    except KeyboardInterrupt:
+        pass
+    values = read_env_values(env)
+    assert values["ANTHROPIC_API_KEY"] == "sk-test-123" and values["HUSHBELL_CHILDREN"] == "Anna"
+    assert "  saved (11 characters)" in said                   # confirms the hidden key without showing it
+
+
 def test_settings_read_from_environment(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HUSHBELL_DATA_DIR", str(tmp_path / "data"))

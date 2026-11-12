@@ -51,15 +51,20 @@ def run_wizard(path: Path, ask=input, ask_secret=getpass.getpass, out=print) -> 
     if not path.exists() and example.exists():
         path.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
     current = read_env_values(path)
-    out(f"\nHushbell setup. Answers are saved to {path}. Press Enter to keep what's already there.\n")
-    answers: dict[str, str] = {}
+    out(f"\nHushbell setup. Answers are saved to {path} as you go. Press Enter to keep what's already there.")
+    out("Keys and tokens stay hidden while you type or paste, like a password.\n")
+    saved = 0
     for key, question, secret in QUESTIONS:
         existing = current.get(key, "")
         hint = " [already set]" if existing and secret else f" [{existing}]" if existing else ""
         reply = (ask_secret if secret else ask)(f"{question}{hint}: ").strip()
         if reply:
-            answers[key] = reply
-    if answers:
-        set_env_values(path, answers)
-    out(f"\nSaved {len(answers)} setting(s). Next: `hushbell doctor`, then `hushbell run`.\n")
+            set_env_values(path, {key: reply})  # saved right away, so stopping halfway loses nothing
+            saved += 1
+            if secret:
+                out(f"  saved ({len(reply)} characters)")
+        elif secret:
+            out("  kept as it was" if existing else "  nothing entered, skipped")
+    out(f"\nSaved {saved} setting(s). Next: `hushbell run`, then open the page it prints. "
+        "`hushbell doctor` checks the setup.\n")
     return 0
