@@ -48,6 +48,9 @@ class Decision(BaseModel):
     reply_text: str = ""
     url: str = ""
     instructions: str = ""
+    date: str = ""               # YYYY-MM-DD the message is about (event day or deadline)
+    time: str = ""               # HH:MM, 24-hour, when the message gives a time
+    event_title: str = ""        # short calendar title, when there is something to put on a calendar
     rule_hit: str = ""           # safety words that matched, if any
     sorted_by: str = "claude"    # "claude", "rules", or "fallback"
 
@@ -76,6 +79,12 @@ class Item:
     sources: list[str] = field(default_factory=list)
     duplicate_count: int = 0
     call_attempts: int = 0
+    # What Hushbell will do once the parent says yes. Each step is a dict with at least
+    # id, type, label, say, enabled and status ("pending", "done", "failed", "skipped").
+    steps: list[dict] = field(default_factory=list)
+    event_date: str = ""
+    event_time: str = ""
+    event_title: str = ""
 
     def to_public(self) -> dict:
         return {
@@ -100,4 +109,8 @@ class Item:
             "result": self.result,
             "sources": self.sources,
             "duplicate_count": self.duplicate_count,
+            "steps": self.steps,
+            "event_date": self.event_date,
+            "event_time": self.event_time,
+            "event_title": self.event_title,
         }

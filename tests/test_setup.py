@@ -43,7 +43,7 @@ def test_env_file_values_are_replaced_in_place(tmp_path):
 def test_wizard_keeps_existing_answers_when_you_press_enter(tmp_path):
     env = tmp_path / ".env"
     env.write_text("HUSHBELL_CHILDREN=Maya\nHUSHBELL_PARENT_NAME=\n", encoding="utf-8")
-    answers = iter(["", "Ana Lopez", "", "", "", "", ""])
+    answers = iter(["", "Ana Lopez", "", "", "", "", "", "", "", ""])
     run_wizard(env, ask=lambda q: next(answers), ask_secret=lambda q: "", out=lambda *a: None)
     values = read_env_values(env)
     assert values["HUSHBELL_CHILDREN"] == "Maya" and values["HUSHBELL_PARENT_NAME"] == "Ana Lopez"

@@ -36,10 +36,10 @@ def test_the_call_reads_the_summary_and_takes_a_keypress(make_engine):
     item_id = client.post("/api/ingest", json=FEVER, headers=AUTH).json()["item_id"]
 
     twiml = client.post(f"/twilio/voice/{item_id}", data={"CallSid": "CA1"}).text
-    assert "<Gather" in twiml and "Press 1 to reply" in twiml and "on my way" in twiml
+    assert "<Gather" in twiml and "Press 1 and I will reply to Ms. Rivera" in twiml and "on my way" in twiml
 
     reply = client.post(f"/twilio/gather/{item_id}", data={"Digits": "1"}).text
-    assert "sending your reply" in reply
+    assert "I am on it: I will reply to Ms. Rivera" in reply
     assert engine.store.get_item(item_id).status == "done"
 
 
@@ -110,11 +110,54 @@ def test_demo_buttons_only_in_demo_mode(make_engine, settings):
     assert client.post("/api/demo/0", headers=AUTH).json()["ok"] is True
 
 
+def test_ask_hushbell(make_engine):
+    class FakeAssistant:
+        def __init__(self):
+            self.seen = None
+
+        def answer(self, question, items):
+            self.seen = (question, [i.text for i in items])
+            return "Sign the field trip form today."
+
+    engine = make_engine()
+    client = TestClient(create_app(engine))
+    assert "needs a Claude key" in client.post("/api/ask", json={"question": "What's due?"}, headers=AUTH).json()["answer"]
+    engine.assistant = FakeAssistant()
+    client.post("/api/ingest", json={"app": "Remind", "sender": "t", "text": "Field trip form due TODAY"}, headers=AUTH)
+    r = client.post("/api/ask", json={"question": "What's due?"}, headers=AUTH)
+    assert r.json() == {"answer": "Sign the field trip form today."}
+    assert engine.assistant.seen == ("What's due?", ["Field trip form due TODAY"])
+    assert client.post("/api/ask", json={"question": ""}, headers=AUTH).status_code == 422
+    assert TestClient(create_app(engine)).post("/api/ask", json={"question": "x"}).status_code == 401
+
+
+def test_assistant_lists_messages_for_claude():
+    from hushbell.assistant import _message_lines
+    from hushbell.models import Item
+
+    item = Item(id="a", created_at=1794500000, updated_at=0, app="Remind", sender="Ms. Rivera",
+                text="Picture day\nnext Thursday", status="later", category="later",
+                event_date="2026-11-19", event_time="")
+    line = _message_lines([item])
+    assert "Remind / Ms. Rivera: Picture day next Thursday" in line
+    assert "saved for later" in line and "about: 2026-11-19" in line
+
+
+def test_demo_pickup_time_is_always_ahead():
+    from datetime import datetime
+
+    from hushbell.web.app import demo_pickup_time
+
+    assert demo_pickup_time(datetime(2026, 11, 13, 10, 42)) == "12:30pm"
+    assert demo_pickup_time(datetime(2026, 11, 13, 10, 30)) == "12pm"
+    assert demo_pickup_time(datetime(2026, 11, 13, 18, 5)) == "8pm"
+
+
 def test_demo_messages_are_about_the_familys_own_child(settings):
     from hushbell.web.app import demo_messages
 
-    assert "Anna has a fever" in demo_messages(["anna"])[3]["text"]
-    assert "Maya has a fever" in demo_messages([])[3]["text"]
+    assert "Anna has a fever" in demo_messages(["anna"])[-1]["text"]
+    assert "Maya has a fever" in demo_messages([])[-1]["text"]
 
 
 def test_start_over_clears_everything_for_a_second_rehearsal(make_engine, settings):

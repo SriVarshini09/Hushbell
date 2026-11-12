@@ -38,7 +38,11 @@ CREATE TABLE IF NOT EXISTS items (
     result TEXT NOT NULL DEFAULT '',
     sources TEXT NOT NULL DEFAULT '[]',
     duplicate_count INTEGER NOT NULL DEFAULT 0,
-    call_attempts INTEGER NOT NULL DEFAULT 0
+    call_attempts INTEGER NOT NULL DEFAULT 0,
+    steps TEXT NOT NULL DEFAULT '[]',
+    event_date TEXT NOT NULL DEFAULT '',
+    event_time TEXT NOT NULL DEFAULT '',
+    event_title TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,8 +77,17 @@ _ITEM_FIELDS = [
     "id", "created_at", "updated_at", "app", "sender", "text", "status", "category",
     "reason", "summary", "child", "due", "action_type", "reply_text", "url",
     "instructions", "rule_hit", "sorted_by", "result", "sources", "duplicate_count",
-    "call_attempts",
+    "call_attempts", "steps", "event_date", "event_time", "event_title",
 ]
+_JSON_FIELDS = ("sources", "steps")
+
+# Columns added after the first release. Older databases get them on start-up.
+_ADDED_COLUMNS = {
+    "steps": "TEXT NOT NULL DEFAULT '[]'",
+    "event_date": "TEXT NOT NULL DEFAULT ''",
+    "event_time": "TEXT NOT NULL DEFAULT ''",
+    "event_title": "TEXT NOT NULL DEFAULT ''",
+}
 
 
 class Store:
@@ -84,6 +97,10 @@ class Store:
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            have = {r["name"] for r in self._conn.execute("PRAGMA table_info(items)").fetchall()}
+            for column, ddl in _ADDED_COLUMNS.items():
+                if column not in have:
+                    self._conn.execute(f"ALTER TABLE items ADD COLUMN {column} {ddl}")
             self._conn.commit()
 
     # ---- items -------------------------------------------------------------
@@ -108,8 +125,9 @@ class Store:
     def update_item(self, item_id: str, **fields) -> Item | None:
         if not fields:
             return self.get_item(item_id)
-        if "sources" in fields:
-            fields["sources"] = json.dumps(fields["sources"])
+        for name in _JSON_FIELDS:
+            if name in fields:
+                fields[name] = json.dumps(fields[name])
         fields["updated_at"] = time.time()
         cols = ", ".join(f"{k} = ?" for k in fields)
         with self._lock:
@@ -224,13 +242,15 @@ class Store:
     @staticmethod
     def _to_row(item: Item) -> dict:
         row = {f: getattr(item, f) for f in _ITEM_FIELDS}
-        row["sources"] = json.dumps(item.sources)
+        for name in _JSON_FIELDS:
+            row[name] = json.dumps(getattr(item, name))
         return row
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> Item:
         data = {f: row[f] for f in _ITEM_FIELDS}
-        data["sources"] = json.loads(data["sources"] or "[]")
+        for name in _JSON_FIELDS:
+            data[name] = json.loads(data[name] or "[]")
         return Item(**data)
 
     def close(self) -> None:

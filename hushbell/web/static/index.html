@@ -28,9 +28,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;fl
 .chip.off::before{content:"● ";color:var(--later)}
 .chip.bad::before{content:"● ";color:var(--urgent)}
 button.mini{font-size:12px;padding:3px 10px;border-radius:999px}
-.action label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}
-textarea.reply{display:block;width:100%;font:inherit;line-height:1.4;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);resize:vertical}
-textarea.reply:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
+.notice{margin:0 0 10px;font-size:13px;color:var(--urgent)}
 .notice.ok{color:var(--ok)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 6px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
@@ -48,11 +46,20 @@ h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 .pill.calling{background:var(--bell);color:#14203A}
 .summary{font-weight:650;margin:6px 0 4px;font-size:15.5px}
 .reason{font-size:13.5px;color:var(--muted)}
-.action{margin-top:8px;font-size:14px;background:var(--soft);border-radius:10px;padding:8px 10px;overflow-wrap:anywhere}
 .original{margin-top:8px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.plan{margin-top:10px;background:var(--soft);border-radius:10px;padding:10px 12px}
+.plan-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.step{display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:14px;overflow-wrap:anywhere}
+.step input[type=checkbox]{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--needs)}
+.step .mark{flex:none;width:18px;text-align:center;font-weight:800}
+.step .mark.done{color:var(--ok)} .step .mark.failed{color:var(--urgent)} .step .mark.skipped{color:var(--later)}
+.step .detail{display:block;font-size:12.5px;color:var(--muted)}
+.step textarea{display:block;width:100%;margin-top:6px;font:inherit;line-height:1.4;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);resize:vertical}
+.step textarea:focus-visible,.ask input:focus-visible,.step input:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 button{font:inherit;font-weight:700;border-radius:10px;padding:9px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
 button.primary{background:var(--needs);border-color:var(--needs);color:#fff}
+button.small{font-size:12.5px;padding:5px 10px;border-radius:8px}
 button:disabled{opacity:.5;cursor:default}
 button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .empty{color:var(--muted);font-size:14px;background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:14px}
@@ -60,9 +67,21 @@ button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .row:last-child{border-bottom:0}
 .row .when{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px}
 .row .kind{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);min-width:70px}
+.row .grow{flex:1;min-width:0}
 .list{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 14px}
+.day{display:flex;gap:12px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.day:last-child{border-bottom:0}
+.day .date{flex:none;width:58px;text-align:center;border-radius:10px;background:var(--soft);padding:4px 0;line-height:1.15}
+.day .date b{display:block;font-size:18px}
+.day .date span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.day .what{flex:1;min-width:0;font-size:14px}
+.day .what small{display:block;color:var(--muted);font-size:12.5px}
+.oncal{font-size:12.5px;color:var(--ok);font-weight:700;white-space:nowrap}
+.ask{display:flex;gap:8px}
+.ask input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.answer{margin-top:10px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--bell);border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px}
+.suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .demo{display:flex;gap:8px;flex-wrap:wrap}
-.notice{margin-top:10px;font-size:13px;color:var(--urgent)}
 footer{margin-top:28px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12.5px;gap:10px;flex-wrap:wrap}
 @media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
@@ -83,6 +102,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   </div>
 
   <h2>Needs you</h2>
+  <div id="notice"></div>
   <div id="needs"></div>
 
   <section id="demoBox" hidden>
@@ -91,10 +111,28 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
       <button type="button" data-demo="0">Bake sale</button>
       <button type="button" data-demo="1">Field trip form</button>
       <button type="button" data-demo="2">WhatsApp repost</button>
-      <button type="button" data-demo="3">Fever</button>
+      <button type="button" data-demo="3">Chess club question</button>
+      <button type="button" data-demo="4">Picture day</button>
+      <button type="button" data-demo="5">Fever</button>
       <button type="button" data-reset="1">Start over</button>
     </div>
   </section>
+
+  <h2>Coming up</h2>
+  <div id="coming"></div>
+
+  <h2>Ask Hushbell</h2>
+  <form class="ask" id="askForm">
+    <label for="askInput" hidden>Question about your school messages</label>
+    <input id="askInput" maxlength="300" autocomplete="off" placeholder="What do I need to do this week?">
+    <button type="submit" class="primary" id="askBtn">Ask</button>
+  </form>
+  <div class="suggest">
+    <button type="button" class="small" data-ask="What do I need to do this week?">This week</button>
+    <button type="button" class="small" data-ask="Is anything due tomorrow?">Due tomorrow</button>
+    <button type="button" class="small" data-ask="What should I pack or bring for school this week?">What to bring</button>
+  </div>
+  <div id="answer"></div>
 
   <h2>Handled and in progress</h2>
   <div id="handled"></div>
@@ -117,40 +155,61 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const time = t => new Date(t * 1000).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
   const busy = new Set();
-  const drafts = {};
-  let notice = "";
-  let noticeOk = false;
+  const drafts = {};          // edited replies, by item id
+  const unticked = {};        // item id -> Set of step ids the parent unticked
+  let notice = "", noticeOk = false, today = "";
 
-  function actionText(it) {
-    if (it.action_type === "reply" && it.reply_text) return `Will reply in ${esc(it.app)}: “${esc(it.reply_text)}”`;
-    if (it.action_type === "open_link" && it.url) return `Will fill in the form: ${esc(it.url)}${it.instructions ? " · " + esc(it.instructions) : ""}`;
-    return "Nothing to send. Approving marks it as seen.";
-  }
-  function replyBox(it) {
-    const value = drafts[it.id] ?? it.reply_text;
-    return `<div class="action"><label for="r-${esc(it.id)}">Reply that will be sent in ${esc(it.app)}. You can change it.</label>
-      <textarea class="reply" id="r-${esc(it.id)}" data-reply-for="${esc(it.id)}" maxlength="300" rows="2">${esc(value)}</textarea></div>`;
-  }
-  function approveLabel(it) {
-    if (it.action_type === "reply") return "Send reply";
-    if (it.action_type === "open_link") return "Fill the form";
-    return "Mark seen";
-  }
+  const MARK = {done: "✓", failed: "✗", skipped: "–"};
+
   function meta(it) {
     const from = it.sources && it.sources.length > 1 ? `${esc(it.sender)} · ${it.sources.map(esc).join(" + ")}` : `${esc(it.sender)} · ${esc(it.app)}`;
     return `${from} · ${time(it.created_at)}${it.due ? " · due " + esc(it.due) : ""}`;
   }
 
+  function planForOpen(it) {
+    if (!it.steps || !it.steps.length) return `<div class="plan"><div class="plan-title">Nothing to send</div>Approving marks it as seen.</div>`;
+    const off = unticked[it.id] || new Set();
+    const rows = it.steps.map(st => {
+      const id = `s-${it.id}-${st.id}`;
+      let extra = "";
+      if (st.type === "reply") {
+        const value = drafts[it.id] ?? it.reply_text;
+        extra = `<textarea class="reply" data-reply-for="${esc(it.id)}" maxlength="300" rows="2" aria-label="Reply text">${esc(value)}</textarea>`;
+      } else if (st.type === "open_link") {
+        extra = `<span class="detail">${esc(it.url)}${it.instructions ? " · " + esc(it.instructions) : ""}</span>`;
+      }
+      return `<div class="step"><input type="checkbox" id="${id}" data-step-item="${esc(it.id)}" data-step="${esc(st.id)}" ${off.has(st.id) ? "" : "checked"}>
+        <label for="${id}" style="flex:1;min-width:0">${esc(st.label)}${extra}</label></div>`;
+    }).join("");
+    return `<div class="plan"><div class="plan-title">Hushbell will, with your OK</div>${rows}</div>`;
+  }
+
+  function planDone(it) {
+    if (!it.steps || !it.steps.length) return "";
+    return `<div class="plan">${it.steps.map(st => `<div class="step"><span class="mark ${esc(st.status)}">${MARK[st.status] || "·"}</span>
+      <span style="flex:1;min-width:0">${esc(st.label)}${st.detail ? `<span class="detail">${esc(st.detail)}</span>` : ""}</span></div>`).join("")}</div>`;
+  }
+
+  function approveLabel(it) {
+    const n = (it.steps || []).length - (unticked[it.id] ? unticked[it.id].size : 0);
+    if (!it.steps || !it.steps.length) return "Mark seen";
+    if (n <= 0) return "Mark seen";
+    if (n === 1) {
+      const only = it.steps.find(s => !(unticked[it.id] || new Set()).has(s.id));
+      return only && only.type === "reply" ? "Send reply" : only && only.type === "open_link" ? "Fill the form" : "Do it";
+    }
+    return `Do these ${n}`;
+  }
+
   function needsCard(it) {
     const calling = it.status === "calling";
-    const cls = it.category === "urgent" ? "urgent" : "";
-    return `<article class="card ${cls}">
+    return `<article class="card ${it.category === "urgent" ? "urgent" : ""}">
       <div class="meta"><span class="pill ${esc(it.category)}">${it.category === "urgent" ? "URGENT" : "NEEDS YOU"}</span>
         ${calling ? '<span class="pill calling">Calling you now</span>' : ""}<span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
       <div class="reason">${it.rule_hit ? "Safety words: " + esc(it.rule_hit) : esc(it.reason)}</div>
-      ${it.action_type === "reply" && it.reply_text ? replyBox(it) : `<div class="action">${actionText(it)}</div>`}
       ${(it.summary || "").includes(it.text) ? "" : `<div class="original">Message: ${esc(it.text)}</div>`}
+      ${planForOpen(it)}
       <div class="btns">
         <button type="button" class="primary" data-approve="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>${approveLabel(it)}</button>
         <button type="button" data-skip="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>I'll handle it</button>
@@ -166,12 +225,25 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     return `<article class="card ${cls}">
       <div class="meta"><span class="pill">${esc(STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
-      ${it.result ? `<div class="reason">${esc(it.result)}</div>` : ""}
-      ${it.status === "failed" ? `<div class="btns"><button type="button" data-retry="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>Try again</button></div>` : ""}
+      ${planDone(it)}
+      ${it.status === "failed" ? `<div class="reason" style="margin-top:8px">${esc(it.result)}</div><div class="btns"><button type="button" data-retry="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>Try again</button></div>` : ""}
     </article>`;
   }
 
+  function dayBox(iso) {
+    const d = new Date(iso + "T12:00:00");
+    const label = iso === today ? "Today" : d.toLocaleDateString([], {weekday: "short"});
+    return `<div class="date"><span>${esc(label)}</span><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString([], {month: "short"}))}</span></div>`;
+  }
+
+  function clock(hhmm) {
+    if (!hhmm) return "";
+    const [h, m] = hhmm.split(":").map(Number);
+    return new Date(2000, 0, 1, h, m).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  }
+
   function render(s) {
+    today = s.today;
     const setup = s.setup;
     const phone = !setup.reading_phone ? ["off", "Phone reading off"]
       : setup.phone_health === "ok" ? ["on", "Phone connected"]
@@ -189,26 +261,36 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     $("sDone").textContent = s.counts.done_today;
     $("demoBox").hidden = !setup.demo;
     $("laterTitle").textContent = `For tonight's digest (${setup.digest_time})`;
+    $("notice").innerHTML = notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "";
 
     const open = s.items.filter(i => i.status === "calling" || i.status === "waiting")
       .sort((a, b) => (a.category === "urgent" ? 0 : 1) - (b.category === "urgent" ? 0 : 1) || b.created_at - a.created_at);
-    const typing = document.activeElement && document.activeElement.classList.contains("reply");
-    if (!typing) {
-      $("needs").innerHTML = (notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "") +
-        (open.length ? open.map(needsCard).join("") : '<div class="empty">Nothing needs you right now. Your phone can stay quiet.</div>');
+    const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#needs textarea");
+    if (!editing) {
+      $("needs").innerHTML = open.length ? open.map(needsCard).join("")
+        : '<div class="empty">Nothing needs you right now. Your phone can stay quiet.</div>';
     }
+
+    $("coming").innerHTML = s.coming_up.length ? `<div class="list">${s.coming_up.map(c => `
+      <div class="day">${dayBox(c.date)}
+        <div class="what">${esc(c.title)}<small>${c.time ? esc(clock(c.time)) + " · " : ""}${c.child ? esc(c.child) : ""}</small></div>
+        ${c.on_calendar ? '<span class="oncal">On calendar ✓</span>'
+          : c.can_add ? `<button type="button" class="small" data-step-run="${esc(c.item_id)}" data-step-id="${esc(c.calendar_step)}">Add to calendar</button>` : ""}
+      </div>`).join("")}</div>`
+      : '<div class="empty">No dates yet. School events and deadlines will show up here.</div>';
 
     const handled = s.items.filter(i => ["sorting","approved","acting","done","failed","skipped","new"].includes(i.status)).slice(0, 20);
     $("handled").innerHTML = handled.length ? handled.map(handledRow).join("") : '<div class="empty">Nothing yet today.</div>';
 
     const later = s.items.filter(i => i.status === "later").slice(0, 40);
     $("later").innerHTML = later.length
-      ? `<div class="list">${later.map(i => `<div class="row"><span class="when">${time(i.created_at)}</span><span>${esc(i.sender)} · ${esc(i.summary || i.text)}</span></div>`).join("")}</div>`
+      ? `<div class="list">${later.map(i => `<div class="row"><span class="when">${time(i.created_at)}</span><span class="grow">${esc(i.sender)} · ${esc(i.summary || i.text)}</span></div>`).join("")}</div>`
       : '<div class="empty">Nothing saved for later yet.</div>';
 
     $("events").innerHTML = s.events.length
-      ? s.events.map(e => `<div class="row"><span class="when">${time(e.at)}</span><span class="kind">${esc(e.kind)}</span><span>${esc(e.detail)}</span></div>`).join("")
+      ? s.events.map(e => `<div class="row"><span class="when">${time(e.at)}</span><span class="kind">${esc(e.kind)}</span><span class="grow">${esc(e.detail)}</span></div>`).join("")
       : '<div class="row">No activity yet.</div>';
+    $("askBtn").disabled = !s.can_ask;
   }
 
   async function refresh() {
@@ -222,37 +304,68 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   async function post(url, id, body, okText) {
     if (id) busy.add(id);
     notice = ""; noticeOk = false;
+    let data = {};
     try {
       const options = {method: "POST", credentials: "same-origin"};
       if (body) { options.headers = {"Content-Type": "application/json"}; options.body = JSON.stringify(body); }
       const r = await fetch(url, options);
-      if (!r.ok) {
-        const data = await r.json().catch(() => ({}));
-        notice = data.detail || "That didn't work. Try again.";
-      } else if (okText) { notice = okText; noticeOk = true; }
+      data = await r.json().catch(() => ({}));
+      if (!r.ok) notice = data.detail || "That didn't work. Try again.";
+      else if (okText) { notice = okText; noticeOk = true; }
     } catch (e) { notice = "Couldn't reach Hushbell. Check that it is still running."; }
     if (id) busy.delete(id);
     refresh();
+    return data;
+  }
+
+  async function ask(question) {
+    question = question.trim();
+    if (!question) return;
+    $("askInput").value = question;
+    $("askBtn").disabled = true;
+    $("answer").innerHTML = '<div class="answer">Thinking…</div>';
+    const data = await post("/api/ask", null, {question});
+    $("answer").innerHTML = `<div class="answer">${esc(data.answer || notice || "Sorry, no answer.")}</div>`;
+    $("askBtn").disabled = false;
   }
 
   document.addEventListener("click", e => {
     const t = e.target.closest("button");
     if (!t) return;
     if (t.dataset.approve) {
-      const box = document.querySelector(`[data-reply-for="${CSS.escape(t.dataset.approve)}"]`);
-      post(`/api/items/${encodeURIComponent(t.dataset.approve)}/approve`, t.dataset.approve, box ? {reply_text: box.value} : null);
-      delete drafts[t.dataset.approve];
+      const id = t.dataset.approve;
+      const box = document.querySelector(`[data-reply-for="${CSS.escape(id)}"]`);
+      const skip = [...(unticked[id] || [])];
+      post(`/api/items/${encodeURIComponent(id)}/approve`, id, {reply_text: box ? box.value : null, skip});
+      delete drafts[id]; delete unticked[id];
     }
     else if (t.dataset.retry) post(`/api/items/${encodeURIComponent(t.dataset.retry)}/retry`, t.dataset.retry);
-    else if (t.dataset.reset) post("/api/demo/reset", null, null, "Cleared. Ready for a fresh run.");
+    else if (t.dataset.stepRun) post(`/api/items/${encodeURIComponent(t.dataset.stepRun)}/steps/${encodeURIComponent(t.dataset.stepId)}`, t.dataset.stepRun, null, "Adding it to your calendar…");
+    else if (t.dataset.reset) { $("answer").innerHTML = ""; post("/api/demo/reset", null, null, "Cleared. Ready for a fresh run."); }
     else if (t.dataset.testcall) post("/api/test-call", null, null, "Calling your phone now. It should ring even on Do Not Disturb.");
     else if (t.dataset.skip) post(`/api/items/${encodeURIComponent(t.dataset.skip)}/skip`, t.dataset.skip);
     else if (t.dataset.demo) post(`/api/demo/${t.dataset.demo}`);
+    else if (t.dataset.ask) ask(t.dataset.ask);
+  });
+
+  document.addEventListener("change", e => {
+    const box = e.target;
+    if (!box.dataset || !box.dataset.stepItem) return;
+    const id = box.dataset.stepItem;
+    unticked[id] = unticked[id] || new Set();
+    if (box.checked) unticked[id].delete(box.dataset.step); else unticked[id].add(box.dataset.step);
+    const btn = document.querySelector(`[data-approve="${CSS.escape(id)}"]`);
+    if (btn) {
+      const n = box.closest(".plan").querySelectorAll("input[type=checkbox]:checked").length;
+      btn.textContent = n === 0 ? "Mark seen" : n === 1 ? "Do it" : `Do these ${n}`;
+    }
   });
 
   document.addEventListener("input", e => {
-    if (e.target.classList && e.target.classList.contains("reply")) drafts[e.target.dataset.replyFor] = e.target.value;
+    if (e.target.dataset && e.target.dataset.replyFor) drafts[e.target.dataset.replyFor] = e.target.value;
   });
+
+  $("askForm").addEventListener("submit", e => { e.preventDefault(); ask($("askInput").value); });
 
   refresh();
   setInterval(refresh, 2000);

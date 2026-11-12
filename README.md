@@ -10,17 +10,33 @@ Hushbell is an open-source agent that watches the school apps on your own phone 
 Do Not Disturb:
 
 - **Noise waits.** Bake sales, newsletters and photos go into one evening digest.
-- **Things that need a yes become one card.** "Field trip form due today" → tap once and
-  Hushbell fills in the form on your phone. You can edit a reply before it's sent.
+- **Things that need a yes become one card.** "Field trip form due today, trip next Friday" →
+  one tap and Hushbell fills in the form *and* puts the trip on your calendar. You can edit a
+  reply or untick any step first.
 - **Emergencies ring through.** Hushbell is the only caller your phone lets through Do Not
-  Disturb. It tells you what happened, you press **1**, and it replies to the teacher inside the app.
+  Disturb. It tells you what happened, you press **1**, and it handles the whole situation on
+  your phone: replies to the teacher, sets a "time to leave" alarm, texts your co-parent, and
+  opens directions to school.
+- **Coming up.** Every date in your school messages (trips, picture day, deadlines) in one list,
+  with "Add to calendar".
+- **Ask Hushbell.** "What do I need to do this week?" Claude answers from your school messages.
 
 You never open a school app, and nothing is sent, signed or paid without your OK.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="The Hushbell page on a phone: two cards waiting for the parent, with an editable reply and a form to approve" width="320">
+  <img src="docs/screenshot.png" alt="The Hushbell page on a phone: an urgent fever message with four steps ready to approve (reply to the teacher, set an alarm, text the co-parent, open directions), and a teacher's question with an editable reply" width="320">
   <br><em>The Hushbell page on a phone, with example messages.</em>
 </p>
+
+### What Hushbell does for each kind of message
+
+| Message | Hushbell's plan, run after your OK |
+|---|---|
+| "Maya has a fever, please pick her up by 1 pm" | Calls you through DND → reply to the teacher, alarm at 12:30 to leave, text your co-parent, directions to school |
+| "Field trip next Friday, permission form due today" + link | Fill in and submit the form, add the trip to your calendar |
+| "Can Leo stay for chess club Wednesday until 4:30?" | Reply to the teacher (you can edit it), add chess club to your calendar |
+| "Picture day is next Thursday" | Saved for tonight's digest, with an "Add to calendar" button |
+| "Bake sale Friday, bring cookies" | Saved, or a card if it's tomorrow, with the date on your calendar |
 
 ## How it works
 
@@ -40,7 +56,8 @@ A 2-minute animated walkthrough is in [`docs/explainer.html`](docs/explainer.htm
              through DND ───────►page (any phone browser)
                      └─────► ⑤ wait for your OK (LangGraph interrupt) ◄──┘
                                         │ press 1 / tap Approve
-                             ⑥ act in the app on your phone (Mobilerun)
+                             ⑥ do the plan on your phone: reply in the app (Mobilerun),
+                               alarm, calendar, text, directions (Android shortcuts)
 ```
 
 - **Reading** uses `adb shell dumpsys notification`, so nothing is installed on the phone for it,
@@ -51,7 +68,12 @@ A 2-minute animated walkthrough is in [`docs/explainer.html`](docs/explainer.htm
   is unreachable, messages are shown to you instead of being dropped, and the safety rules still work.
 - **Waiting for your OK** is a LangGraph `interrupt()`. The phone action runs in a separate step,
   so a resumed run never repeats a side effect.
+- **Planning** is plain rules (`hushbell/plan.py`): Claude says what a message means and when;
+  the rules decide what to do about it, so the same message always gets the same plan.
 - **Acting** uses [Mobilerun](https://github.com/droidrun/mobilerun) to tap and type on the phone.
+  Alarms and directions use Android's own shortcuts and need no AI; calendar events and texts open
+  already filled in, and the agent only taps Save or Send.
+- **Ask Hushbell** sends your question and your recent school messages to Claude, and shows the answer.
 
 ## Try it in two minutes (no phone needed)
 
@@ -146,6 +168,8 @@ All settings are environment variables; `.env.example` lists them. The main ones
 | `HUSHBELL_KEYWORDS` | Words that mark a WhatsApp or Gmail notification as school-related |
 | `HUSHBELL_APPS` | Extra school apps: `package=Label:school` or `:mixed` |
 | `HUSHBELL_EXTRA_URGENT_WORDS` | More words that should always ring you (e.g. `head lice`) |
+| `HUSHBELL_SCHOOL_ADDRESS`, `HUSHBELL_TRAVEL_MINUTES` | Directions to school, and how early the "time to leave" alarm goes off (default 30 min) |
+| `HUSHBELL_PARTNER_NAME`, `HUSHBELL_PARTNER_PHONE` | A co-parent Hushbell can text in an emergency, after your OK |
 | `HUSHBELL_PHONE_BACKEND` | `mobilerun` (default) or `dry-run` |
 | `TWILIO_*`, `HUSHBELL_PARENT_PHONE`, `HUSHBELL_PUBLIC_URL` | Calls through Do Not Disturb |
 | `HUSHBELL_DIGEST_TIME` | When the evening digest is written (default `18:00`) |
@@ -167,6 +191,8 @@ Forwarding apps (Tasker, MacroDroid) or scripts can also post messages to
   you can edit the wording first. Forms can only be approved on the page, where you can see the
   link, never by keypress on a call. The agent is told never to enter passwords or payment
   details and to stop if a form asks for them.
+- **Only the co-parent you name can be texted**, only after your OK, and you see the exact text
+  first. Hushbell never messages anyone else in your contacts.
 - **The phone agent only gets a cleaned-up task.** The original message is never passed to it;
   the sender's name and reply are stripped to one quoted line, and the task tells the agent to
   ignore instructions it sees on screen.

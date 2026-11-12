@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import logging
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -21,17 +22,36 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 COOKIE = "hushbell_session"
 
+def demo_pickup_time(now: datetime | None = None) -> str:
+    """A pickup time about 90 minutes from now, on the half hour, so the demo always has a
+    "time to leave" alarm to set, whatever time of day the demo runs."""
+    now = now or datetime.now()
+    later = now + timedelta(minutes=90)
+    later = later.replace(second=0, microsecond=0)
+    later += timedelta(minutes=(30 - later.minute % 30) % 30)
+    hour = later.hour % 12 or 12
+    suffix = "am" if later.hour < 12 else "pm"
+    return f"{hour}:{later.minute:02d}{suffix}" if later.minute else f"{hour}{suffix}"
+
+
 def demo_messages(children: list[str]) -> list[dict]:
-    """Four example school messages, about the family's own child so they read as real."""
+    """Example school messages, about the family's own child so they read as real."""
     child = (children[0].strip() if children and children[0].strip() else "Maya")
     child = child[:1].upper() + child[1:]
     teacher = "Ms. Rivera · Room 12"
     return [
         {"app": "Remind", "sender": teacher, "text": "Bake sale Friday! Bring cookies."},
-        {"app": "Remind", "sender": teacher, "text": "Field trip form due TODAY: https://forms.gle/fieldtrip12"},
-        {"app": "WhatsApp", "sender": "3rd grade parents", "text": "Jen: Reminder: field trip form due today!"},
         {"app": "Remind", "sender": teacher,
-         "text": f"{child} has a fever (101°F) and needs to be picked up by 1pm."},
+         "text": "Field trip to the science museum next Friday! Permission form due TODAY: "
+                 "https://forms.gle/fieldtrip12"},
+        {"app": "WhatsApp", "sender": "3rd grade parents",
+         "text": "Jen: Reminder: field trip permission form due today!"},
+        {"app": "ClassDojo", "sender": "Mr. Chen",
+         "text": f"Hi! Can {child} stay for chess club this Wednesday until 4:30?"},
+        {"app": "Gmail", "sender": "Lincoln Elementary",
+         "text": "Picture day is next Thursday. Retake forms are in the front office."},
+        {"app": "Remind", "sender": teacher,
+         "text": f"{child} has a fever (101°F) and needs to be picked up by {demo_pickup_time()}."},
     ]
 
 
@@ -43,6 +63,11 @@ class IngestBody(BaseModel):
 
 class ApproveBody(BaseModel):
     reply_text: str | None = Field(default=None, max_length=300)
+    skip: list[str] = Field(default_factory=list, max_length=10)
+
+
+class AskBody(BaseModel):
+    question: str = Field(min_length=1, max_length=300)
 
 
 FAVICON = (
@@ -143,9 +168,23 @@ def create_app(engine: Engine) -> FastAPI:
     @app.post("/api/items/{item_id}/approve")
     def approve(item_id: str, request: Request, body: ApproveBody | None = None):
         require(request)
-        if not engine.resume(item_id, True, "page", reply_text=body.reply_text if body else None):
+        if not engine.resume(item_id, True, "page", reply_text=body.reply_text if body else None,
+                             skip=body.skip if body else None):
             return JSONResponse({"ok": False, "detail": "This message is not waiting for you any more."}, 409)
         return {"ok": True}
+
+    @app.post("/api/items/{item_id}/steps/{step_id}")
+    def run_step(item_id: str, step_id: str, request: Request):
+        """Do one step now for a message that didn't need approval ("Add to calendar")."""
+        require(request)
+        if not engine.run_step_now(item_id, step_id):
+            return JSONResponse({"ok": False, "detail": "That can't be done for this message right now."}, 409)
+        return {"ok": True}
+
+    @app.post("/api/ask")
+    def ask(body: AskBody, request: Request):
+        require(request)
+        return {"answer": engine.ask(body.question)}
 
     @app.post("/api/items/{item_id}/retry")
     def retry(item_id: str, request: Request):

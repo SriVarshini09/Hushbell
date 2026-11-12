@@ -25,9 +25,15 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 | 0:00 | "Parents juggle up to 15 school apps. The Boston Globe says many have stopped reading them. Buried in there is 'your kid has a fever.'" | The parent's phone, Do Not Disturb on |
 | 0:20 | Hand the teacher phone to a judge: "You're the teacher. Send a bake sale reminder, then 'Field trip form due today' with this link, then 'Maya has a fever, please pick her up by 1 pm.'" | Messages appear on the Hushbell page within seconds; the phone stays silent |
 | 0:40 | "Hushbell read those off the phone itself. No school login, no integration. The fever was caught by fixed safety rules before any AI ran. Claude sorted the rest." | Bake sale → Later. Field trip → Needs you. Fever → Urgent |
-| 0:55 | The phone rings. "This is the only call allowed through Do Not Disturb." Answer on speaker, press 1. | Mirror: the agent opens Remind and types the reply. The judge's phone receives it |
-| 1:25 | "At lunch I check once." Tap **Fill the form** on the field trip card. | Mirror: Chrome fills and submits the form |
-| 1:45 | "Three messages became one call and one tap, and I never opened a school app. Hushbell is open source and runs on your own phone and laptop." | The counters on the page; the repo link |
+| 0:55 | The phone rings. "This is the only call allowed through Do Not Disturb." Answer on speaker: Hushbell says it will reply to the teacher, set an alarm, text Sam and open directions. Press 1. | Mirror: the agent replies in Remind (the judge's phone receives it), the "time to leave" alarm is set, the text to Sam goes out, Maps opens with the route to school |
+| 1:25 | "At lunch I check once." Tap **Do these 2** on the field trip card. | Mirror: Chrome fills and submits the form; the trip lands on the calendar |
+| 1:40 | Type in **Ask Hushbell**: "What do I need to do this week?" | A short list: bake sale tomorrow, chess club Wednesday, picture day Thursday |
+| 1:50 | "Three messages became one call and one tap, and I never opened a school app. Hushbell is open source and runs on your own phone and laptop." | The counters and the Coming up calendar; the repo link |
+
+Set `HUSHBELL_PARTNER_NAME` / `HUSHBELL_PARTNER_PHONE` (a teammate's phone, so the text is seen
+landing) and `HUSHBELL_SCHOOL_ADDRESS` before the demo, or those steps won't appear. The demo's
+fever message always asks for pickup about 90 minutes later, so the alarm step appears whatever
+time you present.
 
 ## Likely questions
 

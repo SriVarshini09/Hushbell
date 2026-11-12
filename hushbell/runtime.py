@@ -23,6 +23,8 @@ def build_engine(settings: Settings) -> Engine:
 
     store = Store(settings.db_path)
     checkpointer = SqliteSaver(sqlite3.connect(str(settings.graph_db_path), check_same_thread=False))
+    from hushbell.assistant import Assistant
+
     return Engine(
         settings=settings,
         store=store,
@@ -30,6 +32,7 @@ def build_engine(settings: Settings) -> Engine:
         phone=make_phone(settings),
         voice=make_voice(settings),
         checkpointer=checkpointer,
+        assistant=Assistant(settings),
     )
 
 

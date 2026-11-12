@@ -14,6 +14,10 @@ QUESTIONS: list[tuple[str, str, bool]] = [
     ("HUSHBELL_SCHOOLS", "School names, separated by commas", False),
     ("HUSHBELL_KEYWORDS", "Words that mark a WhatsApp or Gmail message as school-related "
                           "(school name, parent group name), separated by commas", False),
+    ("HUSHBELL_SCHOOL_ADDRESS", "School address, for directions when you need to pick up (Enter to skip)", False),
+    ("HUSHBELL_PARTNER_NAME", "A co-parent Hushbell can text in an emergency, with your OK: their name (Enter to skip)",
+     False),
+    ("HUSHBELL_PARTNER_PHONE", "Their mobile number, like +14155550199 (Enter to skip)", False),
     ("HUSHBELL_PARENT_PHONE", "Your mobile number for urgent calls, like +14155550123 (Enter to skip calls)", False),
     ("TWILIO_ACCOUNT_SID", "Twilio Account SID (Enter to skip)", False),
     ("TWILIO_AUTH_TOKEN", "Twilio Auth Token (Enter to skip)", True),

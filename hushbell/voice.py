@@ -66,6 +66,14 @@ def make_voice(settings: Settings) -> Voice | None:
 
 
 def _option_text(item: Item) -> str:
+    from hushbell.plan import spoken_list
+
+    if item.action_type == "open_link" and item.url:
+        pass  # forms are handled below: the page only
+    elif item.steps and spoken_list(item.steps):
+        reply = f" Your reply will say: {item.reply_text}." if item.action_type == "reply" and item.reply_text else ""
+        return (f"Press 1 and I will {spoken_list(item.steps)}.{reply} "
+                "Press 2 if you will handle it yourself.")
     if item.action_type == "reply" and item.reply_text:
         return f"Press 1 to reply: {item.reply_text}. Press 2 if you will handle it yourself."
     if item.action_type == "open_link":
@@ -122,6 +130,11 @@ def gather_twiml(digit: str, item: Item | None, base_url: str, accepted: bool) -
         response.say("This message was already handled. Goodbye.")
     elif digit == "2":
         response.say("Okay, you will handle it. I will not do anything. Goodbye.")
+    elif item.steps:
+        from hushbell.plan import spoken_list
+
+        response.say(f"Done. I am on it: I will {spoken_list(item.steps)}. "
+                     "You can watch it happen on your Hushbell page. Goodbye.")
     elif item.action_type == "reply":
         response.say("Done. I am sending your reply now. Goodbye.")
     else:

@@ -60,6 +60,10 @@ class Settings:
     children: list[str] = field(default_factory=list)
     parent_name: str = ""
     schools: list[str] = field(default_factory=list)
+    school_address: str = ""      # for "open directions to school"
+    travel_minutes: int = 30      # how long the drive to school takes, for the "time to leave" alarm
+    partner_name: str = ""        # a co-parent Hushbell can text, with your OK
+    partner_phone: str = ""
 
     # Phone (reading)
     adb_path: str = "adb"
@@ -142,6 +146,10 @@ class Settings:
             children=_list(env("HUSHBELL_CHILDREN")),
             parent_name=env("HUSHBELL_PARENT_NAME") or "",
             schools=_list(env("HUSHBELL_SCHOOLS")),
+            school_address=env("HUSHBELL_SCHOOL_ADDRESS") or "",
+            travel_minutes=int(env("HUSHBELL_TRAVEL_MINUTES") or 30),
+            partner_name=env("HUSHBELL_PARTNER_NAME") or "",
+            partner_phone=env("HUSHBELL_PARTNER_PHONE") or "",
             adb_path=env("HUSHBELL_ADB") or find_adb(),
             adb_serial=env("HUSHBELL_ADB_SERIAL") or None,
             poll_seconds=float(env("HUSHBELL_POLL_SECONDS") or 3.0),

@@ -13,11 +13,13 @@ import shlex
 import shutil
 import subprocess
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
 from urllib.parse import urlsplit
 
 from hushbell.config import Settings
 from hushbell.models import Item
+from hushbell.shortcuts import AndroidShortcuts, calendar_times
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class PhoneBackend(Protocol):
     name: str
 
     def perform(self, item: Item) -> ActionResult: ...
+
+    def perform_step(self, item: Item, step: dict) -> ActionResult: ...
 
 
 class UnsafeAction(Exception):
@@ -97,6 +101,48 @@ def build_goal(item: Item, settings: Settings) -> str:
     raise UnsafeAction("This item has nothing for the phone to do.")
 
 
+def describe_step(step: dict) -> str:
+    """One line saying what a step does, for logs and dry runs."""
+    kind = step.get("type")
+    if kind == "set_alarm":
+        return f"set an alarm for {step.get('time')} called “{step.get('message')}”"
+    if kind == "add_calendar":
+        when = step.get("time") or "all day"
+        return f"add “{step.get('title')}” to the calendar on {step.get('date')} ({when})"
+    if kind == "text_partner":
+        return f"text {step.get('name')}: “{step.get('text')}”"
+    if kind == "directions":
+        return f"open directions to {step.get('destination')}"
+    return step.get("label", kind or "step")
+
+
+def check_step(step: dict) -> None:
+    """Refuse steps whose details could do something unexpected."""
+    from hushbell.plan import parse_time, valid_phone
+
+    kind = step.get("type")
+    if kind == "text_partner":
+        if not valid_phone(str(step.get("to", ""))):
+            raise UnsafeAction("The co-parent's phone number doesn't look right, so Hushbell won't text it.")
+        if not clean(step.get("text", ""), 300):
+            raise UnsafeAction("There is no text to send.")
+    elif kind == "set_alarm":
+        if not parse_time(str(step.get("time", ""))):
+            raise UnsafeAction("The alarm time doesn't look right.")
+    elif kind == "add_calendar":
+        try:
+            date.fromisoformat(str(step.get("date", "")))
+        except ValueError as exc:
+            raise UnsafeAction("The calendar date doesn't look right.") from exc
+        if not clean(step.get("title", ""), 80):
+            raise UnsafeAction("The calendar event has no title.")
+    elif kind == "directions":
+        if not clean(step.get("destination", ""), 200):
+            raise UnsafeAction("There is no address to get directions to.")
+    elif kind not in ("reply", "open_link"):
+        raise UnsafeAction("Hushbell doesn't know how to do that step.")
+
+
 class DryRunPhone:
     """Logs what it would do. Useful for trying Hushbell without a phone attached."""
 
@@ -105,6 +151,7 @@ class DryRunPhone:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.goals: list[str] = []
+        self.steps: list[dict] = []
 
     def perform(self, item: Item) -> ActionResult:
         goal = build_goal(item, self.settings)
@@ -112,15 +159,26 @@ class DryRunPhone:
         log.info("[dry run] would ask the phone: %s", goal)
         return ActionResult(True, "Dry run: nothing was sent from the phone.")
 
+    def perform_step(self, item: Item, step: dict) -> ActionResult:
+        check_step(step)
+        self.steps.append(step)
+        log.info("[dry run] would %s", describe_step(step))
+        return ActionResult(True, f"Dry run: would {describe_step(step)}.")
+
 
 class MobilerunPhone:
-    """Runs `mobilerun run "<goal>"`, or replays a recorded macro when one is configured."""
+    """Runs `mobilerun run "<goal>"`, or replays a recorded macro when one is configured.
+
+    Alarms, calendar events, texts and directions start from Android shortcuts, so the
+    agent only has to press Save or Send.
+    """
 
     name = "mobilerun"
 
     def __init__(self, settings: Settings, runner=subprocess.run):
         self.settings = settings
         self._run = runner
+        self.shortcuts = AndroidShortcuts(settings, runner)
 
     def _base_cmd(self) -> list[str]:
         cmd = self.settings.mobilerun_cmd
@@ -134,25 +192,63 @@ class MobilerunPhone:
     def perform(self, item: Item) -> ActionResult:
         macro = self.settings.macros.get(f"{item.app.lower()}:{item.action_type}")
         if macro and item.action_type == "open_link":
-            cmd = self._base_cmd() + ["macro", "replay", macro, "--on-mismatch", "agent"]
-        else:
-            # Recorded macros replay their typed text word for word, so replies always use the agent.
-            cmd = self._base_cmd() + ["run", build_goal(item, self.settings),
-                                      "--steps", str(self.settings.mobilerun_steps)]
-            if self.settings.mobilerun_reasoning:
-                cmd.append("--reasoning")
-            # Left empty, Mobilerun uses whatever `mobilerun configure` saved.
-            if self.settings.mobilerun_provider:
-                cmd += ["--provider", self.settings.mobilerun_provider]
-            if self.settings.mobilerun_model:
-                cmd += ["--model", self.settings.mobilerun_model]
+            return self._invoke(self._base_cmd() + ["macro", "replay", macro, "--on-mismatch", "agent"])
+        # Recorded macros replay their typed text word for word, so replies always use the agent.
+        return self.run_goal(build_goal(item, self.settings))
+
+    def perform_step(self, item: Item, step: dict) -> ActionResult:
+        check_step(step)
+        kind = step["type"]
+        self.shortcuts.wake()
+        if kind == "set_alarm":
+            hour, minute = (int(x) for x in step["time"].split(":"))
+            done = self.shortcuts.set_alarm(hour, minute, clean(step.get("message", "Hushbell"), 80))
+            return ActionResult(done.ok, f"Alarm set for {step['time']}." if done.ok else done.detail)
+        if kind == "directions":
+            done = self.shortcuts.open_directions(clean(step["destination"], 200))
+            return ActionResult(done.ok, "Directions are open on the phone." if done.ok else done.detail)
+        if kind == "add_calendar":
+            begin, end, all_day = calendar_times(step)
+            title = clean(step["title"], 80)
+            opened = self.shortcuts.open_calendar_event(title, begin, end, all_day,
+                                                        f"Added by Hushbell from: {clean(item.text, 200)}")
+            if not opened.ok:
+                return ActionResult(False, opened.detail)
+            saved = self.run_goal(
+                f'A new calendar event titled "{title}" is open on the screen. Tap Save (it may be a check mark '
+                "or a Save button) to save it, then stop. Do not change any details and do not open other apps. "
+                + GUARD)
+            return ActionResult(True, f"“{title}” is on your calendar.") if saved.ok else saved
+        if kind == "text_partner":
+            text = clean(step["text"], 300)
+            opened = self.shortcuts.open_text(step["to"], text)
+            if not opened.ok:
+                return ActionResult(False, opened.detail)
+            sent = self.run_goal(
+                f'A new text message to {clean(step.get("name", "the co-parent"), 40)} is open with this text '
+                f'already typed: "{text}". Tap the Send button once, then stop. Do not change the text or the '
+                "recipient, and do not open other apps. " + GUARD)
+            return ActionResult(True, f"Text sent to {step.get('name', 'your co-parent')}.") if sent.ok else sent
+        raise UnsafeAction("Hushbell doesn't know how to do that step.")
+
+    def run_goal(self, goal: str) -> ActionResult:
+        cmd = self._base_cmd() + ["run", goal, "--steps", str(self.settings.mobilerun_steps)]
+        if self.settings.mobilerun_reasoning:
+            cmd.append("--reasoning")
+        # Left empty, Mobilerun uses whatever `mobilerun configure` saved.
+        if self.settings.mobilerun_provider:
+            cmd += ["--provider", self.settings.mobilerun_provider]
+        if self.settings.mobilerun_model:
+            cmd += ["--model", self.settings.mobilerun_model]
+        return self._invoke(cmd)
+
+    def _invoke(self, cmd: list[str]) -> ActionResult:
         if self.settings.adb_serial:
-            cmd += ["--device", self.settings.adb_serial]
-        if self.settings.adb_serial:
+            cmd = cmd + ["--device", self.settings.adb_serial]
             env = {**os.environ, "ANDROID_SERIAL": self.settings.adb_serial}
         else:
             env = None
-        log.info("Phone agent starting: %s", item.action_type)
+        log.info("Phone agent starting")
         try:
             result = self._run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                timeout=self.settings.mobilerun_timeout, env=env)

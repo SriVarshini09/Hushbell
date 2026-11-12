@@ -27,6 +27,7 @@ from hushbell.models import (
     STATUS_NEW, STATUS_SKIPPED, STATUS_SORTING, STATUS_WAITING, Decision, IncomingMessage, Item,
 )
 from hushbell.phone import PhoneBackend, UnsafeAction
+from hushbell.plan import PICKUP_LABELS, build_steps, parse_date, parse_time, spoken_list
 from hushbell.store import Store
 from hushbell.triage.dedupe import WINDOW_SECONDS, find_duplicate
 from hushbell.triage.rules import SafetyRules
@@ -36,7 +37,6 @@ log = logging.getLogger(__name__)
 
 STATUS_APPROVED = "approved"
 CLOSED_STATUSES = {STATUS_DONE, STATUS_SKIPPED, STATUS_FAILED, STATUS_LATER}
-PICKUP_LABELS = {"fever", "vomiting", "sick", "injury", "pickup now", "early dismissal"}
 
 
 class FlowState(TypedDict, total=False):
@@ -62,10 +62,11 @@ class InlineExecutor(Executor):
 
 class Engine:
     def __init__(self, settings: Settings, store: Store, classifier, phone: PhoneBackend,
-                 voice: Voice | None, checkpointer, executor: Executor | None = None):
+                 voice: Voice | None, checkpointer, executor: Executor | None = None, assistant=None):
         self.settings = settings
         self.store = store
         self.classifier = classifier
+        self.assistant = assistant
         self.phone = phone
         self.voice = voice
         self.rules = SafetyRules(settings.children, settings.extra_urgent_words)
@@ -101,10 +102,12 @@ class Engine:
 
     # ------------------------------------------------------------- the parent
 
-    def resume(self, item_id: str, approved: bool, via: str, reply_text: str | None = None) -> bool:
+    def resume(self, item_id: str, approved: bool, via: str, reply_text: str | None = None,
+               skip: list[str] | None = None) -> bool:
         """The parent answered (keypress or page). Returns False if the item was not waiting.
 
         `reply_text` lets the parent change the wording of a reply before it is sent.
+        `skip` lists step ids the parent unticked on the page.
         """
         target = STATUS_APPROVED if approved else STATUS_SKIPPED
         if not self.store.transition(item_id, OPEN_STATUSES, target):
@@ -115,6 +118,10 @@ class Engine:
             if item and item.action_type == "reply" and wanted and wanted != item.reply_text:
                 self.store.update_item(item_id, reply_text=wanted)
                 self.store.add_event("edited", "You changed the reply before sending", item_id)
+        if approved and skip:
+            item = self.store.get_item(item_id)
+            steps = [dict(s, enabled=False, status="skipped") if s["id"] in skip else s for s in item.steps]
+            self.store.update_item(item_id, steps=steps)
         verb = "approved" if approved else "said they will handle it"
         how = "on the call" if via == "call" else "on the Hushbell page"
         self.store.add_event("answer", f"Parent {verb} {how}", item_id)
@@ -162,13 +169,43 @@ class Engine:
             self.store.add_event("retry", "Sorting this message again", item_id)
             self.executor.submit(self._run, item_id, {"item_id": item_id})
             return True
-        if item.action_type not in ("reply", "open_link"):
+        if not _to_do(item.steps):
             return False
         if not self.store.transition(item_id, {STATUS_FAILED}, STATUS_APPROVED):
             return False
-        self.store.add_event("retry", "Trying again on the phone", item_id)
+        self.store.add_event("retry", "Trying the unfinished steps again on the phone", item_id)
         self.executor.submit(self._perform, item_id)
         return True
+
+    def run_step_now(self, item_id: str, step_id: str) -> bool:
+        """Do one step of a message that didn't need approval, like "Add to calendar" on a later item."""
+        item = self.store.get_item(item_id)
+        if not item or item.status not in {STATUS_LATER, STATUS_DONE, STATUS_SKIPPED}:
+            return False
+        step = next((s for s in item.steps if s["id"] == step_id), None)
+        if not step or step["type"] in ("reply", "open_link") or step.get("status") == "done":
+            return False
+        self.store.add_event("asked", f"You asked Hushbell to {step['say']}", item_id)
+        self.executor.submit(self._run_one_step, item_id, step_id)
+        return True
+
+    def _run_one_step(self, item_id: str, step_id: str) -> None:
+        item = self.store.get_item(item_id)
+        step = next((s for s in item.steps if s["id"] == step_id), None)
+        if step is None:
+            return
+        ok, detail = self._do_step(item, step)
+        steps = [dict(s, enabled=True, status="done" if ok else "failed", detail=detail) if s["id"] == step_id else s
+                 for s in self.store.get_item(item_id).steps]
+        self.store.update_item(item_id, steps=steps)
+        self.store.add_event("done" if ok else "failed", detail, item_id)
+
+    def ask(self, question: str) -> str:
+        """Answer a question about recent school messages ("What do I need this week?")."""
+        if self.assistant is None:
+            return "Asking needs a Claude key. Run `hushbell init` to add one."
+        items = self.store.list_items(since=time.time() - 30 * 24 * 3600, limit=200)
+        return self.assistant.answer(question, items)
 
     def reset(self) -> None:
         """Start over: clear all messages and the log (used between demo rehearsals)."""
@@ -222,7 +259,32 @@ class Engine:
                 "digest_time": self.settings.digest_time,
             },
             "digest": self.digest(since=day_start),
+            "today": time.strftime("%Y-%m-%d"),
+            "coming_up": self.coming_up(),
+            "can_ask": self.assistant is not None,
         }
+
+    def coming_up(self, days: int = 21) -> list[dict]:
+        """Dated school events and deadlines from today on, soonest first (a family calendar view)."""
+        today = time.strftime("%Y-%m-%d")
+        items = self.store.list_items(since=time.time() - 30 * 24 * 3600, limit=500)
+        rows = []
+        for i in items:
+            day = parse_date(i.event_date)
+            if not day or i.event_date < today or (day - parse_date(today)).days > days:
+                continue
+            if i.category == "urgent":
+                continue  # urgent messages sit at the top of the page, not on the calendar view
+            calendar = next((s for s in i.steps if s["type"] == "add_calendar"), None)
+            rows.append({
+                "item_id": i.id, "date": i.event_date, "time": i.event_time,
+                "title": i.event_title or i.summary or i.text, "child": i.child, "category": i.category,
+                "calendar_step": calendar["id"] if calendar else "",
+                "on_calendar": bool(calendar and calendar.get("status") == "done"),
+                "can_add": bool(calendar) and i.status in {STATUS_LATER, STATUS_DONE, STATUS_SKIPPED}
+                           and calendar.get("status") != "done",
+            })
+        return sorted(rows, key=lambda r: (r["date"], r["time"] or "99:99"))
 
     def digest(self, since: float) -> dict[str, Any]:
         items = self.store.list_items(since=since, limit=500)
@@ -273,11 +335,16 @@ class Engine:
         item = self._item(state)
         self.store.update_item(item.id, status=STATUS_SORTING)
         decision = self.decide(item)
+        labels = [x.strip() for x in decision.rule_hit.split(",") if x.strip()]
+        steps = build_steps(item, decision, self.settings, labels)
         self.store.update_item(
             item.id, category=decision.category, reason=decision.reason, summary=decision.summary,
             child=decision.child, due=decision.due, action_type=decision.action_type,
             reply_text=decision.reply_text, url=decision.url, instructions=decision.instructions,
-            rule_hit=decision.rule_hit, sorted_by=decision.sorted_by,
+            rule_hit=decision.rule_hit, sorted_by=decision.sorted_by, steps=steps,
+            event_date=decision.date if parse_date(decision.date) else "",
+            event_time=decision.time if parse_time(decision.time) else "",
+            event_title=decision.event_title.strip()[:80],
         )
         label = {"urgent": "URGENT", "needs_you": "NEEDS YOU", "later": "LATER"}[decision.category]
         why = f"safety words: {decision.rule_hit}" if decision.rule_hit else decision.reason
@@ -343,37 +410,55 @@ class Engine:
     def _route_answer(self, state: FlowState) -> str:
         if not state.get("approved"):
             return "skip"
-        item = self._item(state)
-        return "act" if item.action_type in ("reply", "open_link") else "mark_seen"
+        return "act" if _to_do(self._item(state).steps) else "mark_seen"
 
     def _node_act(self, state: FlowState) -> FlowState:
         self._perform(state["item_id"])
         return {}
 
     def _perform(self, item_id: str) -> None:
-        """Do the approved action on the phone. Runs at most once per approval."""
+        """Do the approved steps on the phone, in order. Runs at most once per approval.
+
+        Each step's result is saved as it finishes, so the page shows progress, and
+        "Try again" only redoes the steps that didn't finish.
+        """
         if not self.store.transition(item_id, {STATUS_APPROVED}, STATUS_ACTING):
             return  # already done by an earlier run
         item = self.store.get_item(item_id)
-        what = "Replying in " + item.app if item.action_type == "reply" else "Filling in the form"
-        self.store.add_event("acting", f"{what} on the parent's phone", item.id)
-        try:
-            result = self.phone.perform(item)
-        except UnsafeAction as exc:
-            self.store.update_item(item.id, status=STATUS_FAILED, result=str(exc))
-            self.store.add_event("stopped", str(exc), item.id)
-            return
-        except Exception as exc:  # noqa: BLE001 - a phone problem must not take the engine down
-            log.exception("Phone action failed for %s", item.id)
-            self.store.update_item(item.id, status=STATUS_FAILED, result=f"The phone step failed: {str(exc)[:200]}")
-            self.store.add_event("failed", f"{what} did not finish: {str(exc)[:160]}", item.id)
-            return
-        if result.ok:
-            self.store.update_item(item.id, status=STATUS_DONE, result=result.detail)
-            self.store.add_event("done", f"{what}: done. {result.detail}", item.id)
+        steps = [dict(s) for s in item.steps]
+        todo = [s for s in steps if s.get("enabled", True) and s.get("status") != "done"]
+        self.store.add_event("acting", f"Working on your phone: {spoken_list(todo)}", item.id)
+        failures: list[str] = []
+        for step in todo:
+            ok, detail = self._do_step(self.store.get_item(item_id), step)
+            step["status"], step["detail"] = ("done" if ok else "failed"), detail
+            self.store.update_item(item_id, steps=steps)
+            self.store.add_event("done" if ok else "failed", detail, item.id)
+            if not ok:
+                failures.append(detail.rstrip("."))
+        finished = [s["detail"] for s in steps if s.get("status") == "done" and s.get("detail")]
+        if failures:
+            self.store.update_item(item_id, status=STATUS_FAILED,
+                                   result=". ".join(failures) + ". Check the phone, then press Try again.")
         else:
-            self.store.update_item(item.id, status=STATUS_FAILED, result=result.detail)
-            self.store.add_event("failed", f"{what} did not finish: {result.detail}", item.id)
+            self.store.update_item(item_id, status=STATUS_DONE, result=" ".join(finished) or "Done.")
+
+    def _do_step(self, item: Item, step: dict) -> tuple[bool, str]:
+        """Run one step. Returns (ok, a sentence for the parent)."""
+        try:
+            if step["type"] in ("reply", "open_link"):
+                result = self.phone.perform(item)
+                if result.ok:
+                    what = (f"Reply sent in {item.app}." if step["type"] == "reply" else "Form submitted.")
+                    return True, what if "Dry run" not in result.detail else f"{what} (dry run)"
+                return False, f"{step['label']} didn't finish: {result.detail}"
+            result = self.phone.perform_step(item, step)
+            return result.ok, (result.detail if result.ok else f"{step['label']} didn't finish: {result.detail}")
+        except UnsafeAction as exc:
+            return False, f"Stopped: {exc}"
+        except Exception as exc:  # noqa: BLE001 - a phone problem must not take the engine down
+            log.exception("Phone step failed for %s", item.id)
+            return False, f"{step['label']} didn't finish: {str(exc)[:160]}"
 
     def _node_mark_seen(self, state: FlowState) -> FlowState:
         item = self._item(state)
@@ -400,6 +485,12 @@ class Engine:
 
     def shutdown(self) -> None:
         self.executor.shutdown(wait=False, cancel_futures=True)
+
+
+def _to_do(steps: list[dict]) -> list[dict]:
+    """Steps that the parent left ticked and that haven't run yet."""
+    return [s for s in steps if s.get("enabled", True) and s.get("status") != "done"
+            and s["type"] in ("reply", "open_link", "set_alarm", "text_partner", "directions", "add_calendar")]
 
 
 def _short(text: str, n: int = 90) -> str:
