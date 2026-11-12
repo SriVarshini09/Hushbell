@@ -60,12 +60,42 @@ def test_wizard_saves_each_answer_right_away_and_confirms_hidden_ones(tmp_path):
         raise KeyboardInterrupt                                # the parent closes the terminal halfway
 
     try:
-        run_wizard(env, ask=stop_after_children, ask_secret=lambda q: "sk-test-123", out=lambda *a: said.append(a[0]))
+        run_wizard(env, ask=stop_after_children, ask_secret=lambda q: "sk-ant-test-123", out=lambda *a: said.append(a[0]))
     except KeyboardInterrupt:
         pass
     values = read_env_values(env)
-    assert values["ANTHROPIC_API_KEY"] == "sk-test-123" and values["HUSHBELL_CHILDREN"] == "Anna"
-    assert "  saved (11 characters)" in said                   # confirms the hidden key without showing it
+    assert values["ANTHROPIC_API_KEY"] == "sk-ant-test-123" and values["HUSHBELL_CHILDREN"] == "Anna"
+    assert "  saved (15 characters)" in said                   # confirms the hidden key without showing it
+
+
+KEY = "sk-ant-api03-" + "Ab3_x-" * 15
+
+
+def test_api_key_cleanup():
+    from hushbell.setup_wizard import clean_api_key, key_problem
+
+    assert clean_api_key(KEY) == (KEY, "")
+    assert clean_api_key(f'  "{KEY}"  ')[0] == KEY
+    # Hidden input: the key pasted three times, then a command pasted after it.
+    messy = KEY * 3 + r".\.venv\Scripts\hushbell.exe run --no-phone --dry-run --demo"
+    key, note = clean_api_key(messy)
+    assert key == KEY and "pasted 3 times" in note
+    assert clean_api_key(KEY + " run the demo")[0] == KEY
+    assert clean_api_key("GPWxFEjgfQKTJJQr")[0] == ""                  # not a Claude key at all
+    assert clean_api_key(KEY + "sk-ant-api03-somethingelse")[0] == ""  # two different keys
+    assert key_problem(KEY) == "" and key_problem("") == ""
+    assert "extra text" in key_problem(messy)
+    assert "doesn't look like" in key_problem("hello")
+
+
+def test_wizard_repairs_a_key_pasted_twice(tmp_path):
+    env = tmp_path / ".env"
+    env.write_text("ANTHROPIC_API_KEY=\n", encoding="utf-8")
+    said = []
+    secrets = iter([KEY + KEY, ""])
+    run_wizard(env, ask=lambda q: "", ask_secret=lambda q: next(secrets), out=lambda *a: said.append(a[0]))
+    assert read_env_values(env)["ANTHROPIC_API_KEY"] == KEY
+    assert "  The key was pasted 2 times. Saved one copy." in said
 
 
 def test_settings_read_from_environment(tmp_path, monkeypatch):

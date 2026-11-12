@@ -21,6 +21,43 @@ QUESTIONS: list[tuple[str, str, bool]] = [
 ]
 
 
+_ONE_KEY = re.compile(r"sk-ant-(?:(?!sk-ant-)[A-Za-z0-9_\-])+")
+
+
+def clean_api_key(text: str) -> tuple[str, str]:
+    """Pull one Claude API key out of what was typed or pasted.
+
+    Returns (key, note). The key is "" when the text doesn't hold a usable key.
+    Hidden input makes it easy to paste a key several times, or with other text
+    after it, so those cases are repaired instead of saved as they are.
+    """
+    text = text.strip().strip("\"'")
+    found = _ONE_KEY.findall(text)
+    if not found:
+        return "", "That doesn't look like a Claude API key (they start with sk-ant-). Not saved."
+    if len(found) == 1:
+        key = found[0]
+        if key == text:
+            return key, ""
+        return key, "There was extra text around the key. Saved just the key."
+    # Several copies run together. The last one may have other text stuck to it, so trust the first.
+    if found[0] != found[1]:
+        return "", "That looks like several different keys. Paste one key only. Not saved."
+    return found[0], f"The key was pasted {len(found)} times. Saved one copy."
+
+
+def key_problem(value: str) -> str:
+    """Why a stored ANTHROPIC_API_KEY can't work, or "" if its shape is fine."""
+    if not value:
+        return ""
+    key, _ = clean_api_key(value)
+    if not key:
+        return "it doesn't look like a Claude API key (they start with sk-ant-)"
+    if key != value.strip():
+        return "it has extra text or repeated copies in it"
+    return ""
+
+
 def set_env_values(path: Path, values: dict[str, str]) -> None:
     """Set KEY=value lines in a .env file, replacing existing (or commented-out) lines for the same key."""
     lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
@@ -58,12 +95,18 @@ def run_wizard(path: Path, ask=input, ask_secret=getpass.getpass, out=print) -> 
         existing = current.get(key, "")
         hint = " [already set]" if existing and secret else f" [{existing}]" if existing else ""
         reply = (ask_secret if secret else ask)(f"{question}{hint}: ").strip()
+        rejected = False
+        if reply and key == "ANTHROPIC_API_KEY":
+            reply, note = clean_api_key(reply)
+            rejected = not reply
+            if note:
+                out(f"  {note}")
         if reply:
             set_env_values(path, {key: reply})  # saved right away, so stopping halfway loses nothing
             saved += 1
             if secret:
                 out(f"  saved ({len(reply)} characters)")
-        elif secret:
+        elif secret and not rejected:
             out("  kept as it was" if existing else "  nothing entered, skipped")
     out(f"\nSaved {saved} setting(s). Next: `hushbell run`, then open the page it prints. "
         "`hushbell doctor` checks the setup.\n")

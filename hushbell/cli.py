@@ -202,7 +202,13 @@ def cmd_doctor(settings: Settings, live: bool) -> int:
     _ok("access token is set (see `hushbell token`)")
 
     print("\nClaude (sorting)")
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
+    from hushbell.setup_wizard import key_problem
+
+    bad_key = key_problem(os.environ.get("ANTHROPIC_API_KEY", ""))
+    if bad_key:
+        problems += 1
+        _warn(f"ANTHROPIC_API_KEY is set, but {bad_key}", "run `hushbell init` and paste the key once")
+    elif os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
         _ok(f"credentials found; model {settings.model}, effort {settings.effort}")
     else:
         problems += 1
