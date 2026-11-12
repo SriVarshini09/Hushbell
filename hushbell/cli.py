@@ -49,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("token", help="print the access token for the Hushbell page")
 
     args = parser.parse_args(argv)
+    # School messages can contain emoji that some Windows terminals can't print. Never crash on them.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     if args.command == "init":
         from pathlib import Path
 
@@ -111,11 +115,15 @@ def cmd_run(settings: Settings, args) -> int:
     clock.start()
 
     print()
+    lan = _lan_ip()
+    on_phone = f"http://{lan}:{settings.port}" if lan else f"http://<this laptop's IP>:{settings.port}"
+    has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
     print("  HUSHBELL is running.")
-    print(f"  Page:   http://localhost:{settings.port}   (on your phone: http://<this laptop's IP>:{settings.port})")
+    print(f"  Page:   http://localhost:{settings.port}   (on your phone, same Wi-Fi: {on_phone})")
     print(f"  Token:  {settings.access_token}")
+    print(f"  Sort:   {'Claude (' + settings.model + ')' if has_key else 'safety rules only: no Claude key yet (run `hushbell init`)'}")
     print(f"  Calls:  {'on' if settings.calls_enabled else 'off (set TWILIO_* and HUSHBELL_PARENT_PHONE)'}")
-    print(f"  Phone:  reading {'on' if reader else 'off'} · actions: {engine.phone.name}")
+    print(f"  Phone:  reading {'on' if reader else 'off'} | actions: {engine.phone.name}")
     print(f"  Data:   {settings.data_dir}")
     print()
     try:
@@ -126,6 +134,18 @@ def cmd_run(settings: Settings, args) -> int:
         clock.stop_event.set()
         engine.shutdown()
     return 0
+
+
+def _lan_ip() -> str:
+    """This computer's address on the local network, for opening the page from a phone."""
+    import socket
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("10.255.255.255", 1))  # no packet is sent; this only picks the outgoing interface
+            return probe.getsockname()[0]
+    except OSError:
+        return ""
 
 
 def _use_ngrok_if_running(settings: Settings) -> None:
