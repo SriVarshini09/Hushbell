@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Hushbell Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Plan: school-bus yellow bell accent on cool paper; semantic red/blue/grey for urgent/needs-you/later.
+     Layout: fixed 1600x900 stage scaled to fit. Phones on the left (teacher, parent), the backend on the right, captions at the bottom. */
+  --paper:#F2F4F7; --ink:#14203A; --muted:#5C6679; --line:#D3DAE4; --card:#FFFFFF;
+  --pass:#F4B400; --urgent:#D2433F; --needs:#2E6BD6; --later:#7C8597; --ok:#1E9A5E; --term:#121A2E;
+  --remind:#5B57D1; --dojo:#2A9FD6; --wa:#23A05A; --gmail:#D9483B; --bw:#E0862F;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body)}
+.page{max-width:1600px;margin:0 auto;padding:20px 16px 32px}
+.intro h1{font:800 28px/1.15 var(--display);margin:0 0 4px;text-wrap:balance}
+.intro p{margin:0 0 14px;color:var(--muted);font:15px/1.5 var(--body);max-width:70ch}
+#wrap{position:relative;width:100%;overflow:hidden;border-radius:14px;border:1px solid var(--line);background:var(--paper)}
+#stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;background:var(--paper);overflow:hidden}
+body.capture .page{padding:0;max-width:none}
+body.capture .intro,body.capture #controls,body.capture .script{display:none}
+body.capture #wrap{width:1600px;height:900px;border:0;border-radius:0}
+
+/* top bar */
+.topbar{position:absolute;left:40px;top:20px;width:1520px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px;min-width:330px}
+.pass{background:var(--pass);color:var(--ink);font:800 18px/1 var(--display);letter-spacing:.08em;padding:8px 12px;border-radius:8px}
+.pass.sm{font-size:12px;padding:5px 8px;border-radius:6px}
+.logo-sub{font:500 14px var(--body);color:var(--muted)}
+.scene{font:600 22px var(--display)}
+.clock{font:500 15px var(--mono);color:var(--muted);min-width:330px;text-align:right}
+
+/* phones */
+.phone{position:absolute;width:270px;height:560px;border-radius:40px;background:#1B2234;padding:10px;box-shadow:0 18px 40px rgba(20,32,58,.18)}
+.screen{position:relative;width:100%;height:100%;border-radius:31px;overflow:hidden;background:#fff}
+.sbar{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:600 12px var(--body);color:var(--ink)}
+.sb-r{display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:500}
+.sb-r svg{display:block}
+.layer{position:absolute;left:0;top:28px;width:250px;height:512px;background:#fff}
+.plabel{position:absolute;width:270px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.plabel b{font:700 16px var(--display)}
+.plabel span{font:13px var(--body);color:var(--muted)}
+.appbar{height:52px;padding:8px 14px;border-bottom:1px solid var(--line)}
+.appbar.remind{background:#EEEDFB}
+.ab-t{font:700 14px var(--body)}
+.ab-s{font:11.5px var(--body);color:var(--muted)}
+.thread{position:absolute;top:52px;left:0;right:0;height:396px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:10px}
+.bub{max-width:196px;padding:8px 10px;border-radius:14px;font:13px/1.3 var(--body)}
+.bub.out{align-self:flex-end;background:var(--remind);color:#fff;border-bottom-right-radius:4px}
+.bub.in{align-self:flex-start;background:#EEF1F5;border-bottom-left-radius:4px}
+.bub small{display:block;font:600 10.5px var(--body);color:var(--muted);margin-bottom:2px}
+.bub.hl{box-shadow:0 0 0 3px var(--ok)}
+.compose{position:absolute;left:0;right:0;top:452px;height:44px;display:flex;gap:6px;padding:0 10px;align-items:center}
+.field{flex:1;height:34px;border:1px solid var(--line);border-radius:17px;padding:0 12px;font:12.5px/32px var(--body);white-space:nowrap;overflow:hidden;color:var(--ink);background:#fff}
+.field:empty::before{content:"Message";color:#9AA3B2}
+.sendbtn{height:34px;padding:0 12px;border-radius:17px;background:var(--remind);color:#fff;font:600 12.5px/34px var(--body)}
+
+/* parent: lock screen */
+.bigtime{position:absolute;top:12px;width:100%;text-align:center;font:600 54px/1 var(--display)}
+.date{position:absolute;top:72px;width:100%;text-align:center;font:500 13px var(--body);color:var(--muted)}
+.dndpill{position:absolute;top:98px;left:50%;transform:translateX(-50%);background:#E6E9F7;color:#3B3F8F;border-radius:14px;padding:5px 12px;font:600 12px var(--body);white-space:nowrap;display:flex;gap:6px;align-items:center}
+.unread{position:absolute;top:134px;width:100%;text-align:center;font:12px var(--body);color:var(--muted)}
+.unread b{color:var(--ink)}
+.nlist{position:absolute;top:162px;left:8px;right:8px;height:346px;overflow:hidden}
+.nrow{position:absolute;left:0;right:0;top:0;height:48px;background:#F3F5F8;border-radius:12px;display:flex;gap:8px;align-items:center;padding:0 10px}
+.ai{width:22px;height:22px;border-radius:6px;color:#fff;font:700 12px/22px var(--body);text-align:center;flex:none;font-style:normal}
+.nb{min-width:0;flex:1}
+.nt{font:11px var(--body);color:var(--muted);display:flex;gap:4px;white-space:nowrap;overflow:hidden}
+.nt b{color:var(--ink);font-weight:600}
+.nt span:last-child{margin-left:auto}
+.nx{font:12px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* parent: call */
+.call{background:#F7F8FB}
+.rings{position:absolute;top:24px;left:83px;width:84px;height:84px}
+.ring{position:absolute;inset:0;border-radius:50%;border:3px solid var(--pass)}
+.avatar{position:absolute;inset:0;border-radius:50%;background:var(--pass);font:800 24px/84px var(--display);text-align:center}
+.cname{position:absolute;top:120px;width:100%;text-align:center;font:700 20px var(--display)}
+.csub{position:absolute;top:150px;width:100%;text-align:center;font:12px var(--body);color:var(--muted)}
+.cbtns{position:absolute;top:410px;left:0;right:0;height:90px}
+.cb{position:absolute;top:0;width:56px;height:56px;border-radius:50%}
+.cb.dec{left:40px;background:var(--urgent)}
+.cb.acc{left:154px;background:var(--ok)}
+.cb span{position:absolute;top:62px;left:-22px;width:100px;text-align:center;font:12px var(--body);color:var(--muted)}
+.speech{position:absolute;top:180px;left:14px;right:14px;min-height:118px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:12.5px/1.4 var(--body)}
+.speech small{display:block;font:600 10.5px var(--mono);color:var(--muted);margin-bottom:3px;letter-spacing:.04em}
+.keypad{position:absolute;top:330px;left:30px;display:grid;grid-template-columns:repeat(3,58px);gap:6px 8px}
+.key{height:34px;border-radius:10px;background:#E9ECF2;font:600 15px/34px var(--body);text-align:center}
+.key.hl{background:var(--ok);color:#fff}
+
+/* parent: Remind chat */
+.cmsg{position:absolute;left:12px;max-width:200px;padding:9px 11px;border-radius:14px;font:13px/1.35 var(--body)}
+.cmsg.in{background:#EEF1F5;border-bottom-left-radius:4px}
+.cmsg.out{left:auto;right:12px;background:var(--remind);color:#fff;border-bottom-right-radius:4px}
+.cmsg small{display:block;margin-top:4px;font:10.5px var(--body);opacity:.85}
+.agentbar{position:absolute;left:10px;right:10px;top:58px;height:26px;border-radius:13px;background:var(--pass);font:600 11.5px/26px var(--body);text-align:center}
+
+/* parent: Hushbell page */
+.hp-head{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid var(--line);font:600 13px var(--body)}
+.sec{position:absolute;left:12px;font:700 11px var(--mono);letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.card{position:absolute;left:10px;right:10px;border-radius:12px;border:1px solid var(--line);background:#fff;padding:10px 12px}
+.card.needs{border-left:5px solid var(--needs);height:124px}
+.card.done{border-left:5px solid var(--ok)}
+.card.later{border-left:5px solid var(--later)}
+.ct{font:700 13.5px var(--body)}
+.cm{font:11.5px var(--body);color:var(--muted);margin-top:2px}
+.cr{font:11.5px var(--body);margin-top:4px}
+.btns{position:absolute;left:12px;top:82px;display:flex;gap:8px}
+.btn{height:30px;padding:0 14px;border-radius:15px;border:1px solid var(--line);font:600 12.5px/28px var(--body)}
+.btn.pri{background:var(--needs);border-color:var(--needs);color:#fff;width:96px;text-align:center;padding:0}
+.approved{position:absolute;left:12px;top:88px;font:600 12.5px var(--body);color:var(--ok)}
+
+/* parent: form */
+.urlbar{margin:8px 10px;height:28px;border-radius:14px;background:#EEF1F5;font:11.5px/28px var(--mono);padding:0 12px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.fhead{position:absolute;top:44px;left:10px;right:10px;height:66px;border-radius:10px;background:#E8EFFC;border-top:6px solid var(--needs);padding:8px 12px}
+.ft{font:700 15px var(--display)}
+.fs{font:11px var(--body);color:var(--muted)}
+.flabel{position:absolute;left:14px;font:600 11.5px var(--body)}
+.finput{position:absolute;left:14px;right:14px;height:28px;border-bottom:2px solid var(--line);font:13px/28px var(--body)}
+.finput.focus{border-color:var(--needs)}
+.fcheck{position:absolute;left:14px;right:14px;height:20px;display:flex;gap:8px;align-items:center;font:12px var(--body)}
+.cbx{width:20px;height:20px;border:2px solid var(--muted);border-radius:4px;flex:none;color:#fff;font:700 13px/16px var(--body);text-align:center}
+.cbx.on{background:var(--needs);border-color:var(--needs)}
+.fsubmit{position:absolute;left:14px;width:96px;height:36px;border-radius:8px;background:var(--needs);color:#fff;font:600 13px/36px var(--body);text-align:center}
+.fdone{position:absolute;left:10px;right:10px;top:150px;padding:18px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(20,32,58,.18);font:600 14px/1.4 var(--body);color:var(--ok);text-align:center}
+
+/* parent: summary */
+.stats{position:absolute;top:60px;left:10px;right:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stats div{background:#F3F5F8;border-radius:12px;padding:8px 10px;height:68px}
+.stats b{display:block;font:800 26px/1 var(--display);font-variant-numeric:tabular-nums}
+.stats span{display:block;margin-top:3px;font:11px/1.25 var(--body);color:var(--muted)}
+.dig{position:absolute;top:242px;left:10px;right:10px;display:flex;flex-direction:column;gap:6px}
+.di{font:12.5px var(--body);display:flex;gap:8px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dot.later{background:var(--later)}
+.dot.ok{background:var(--ok)}
+.di.muted{color:var(--muted);border-style:dashed}
+
+/* backend */
+.brain{position:absolute;background:#E8EDF4;border:1px solid var(--line);border-radius:20px}
+.brain .bt{position:absolute;left:20px;top:12px;font:800 20px var(--display)}
+.brain .bs{position:absolute;left:192px;top:17px;font:13px var(--body);color:var(--muted)}
+.box{position:absolute;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+.box .n{font:700 11px var(--mono);color:var(--muted);letter-spacing:.04em}
+.box .h{font:700 16px/1.2 var(--display);margin-top:2px}
+.box .d{font:12px/1.3 var(--body);color:var(--muted);margin-top:2px;white-space:nowrap}
+.box .tag{position:absolute;right:10px;top:9px;font:500 10.5px var(--mono);background:#EEF1F6;border-radius:5px;padding:2px 6px;color:var(--muted)}
+.box .st{position:absolute;left:12px;bottom:8px;font:600 11.5px var(--mono);color:var(--ink);white-space:nowrap}
+.box.on{border-color:var(--pass);box-shadow:0 0 0 4px rgba(244,180,0,.25)}
+.box.hit{border-color:var(--urgent);box-shadow:0 0 0 5px rgba(210,67,63,.25)}
+.box.wait{border-style:dashed;border-color:var(--needs)}
+.lane .h.u{color:var(--urgent)} .lane .h.n{color:var(--needs)} .lane .h.l{color:var(--later)}
+.lane.u.on{border-color:var(--urgent);box-shadow:0 0 0 4px rgba(210,67,63,.18)}
+.lane.n.on{border-color:var(--needs);box-shadow:0 0 0 4px rgba(46,107,214,.18)}
+.lane.l.on{border-color:var(--later);box-shadow:0 0 0 4px rgba(124,133,151,.22)}
+.lane .st{left:auto;right:12px;bottom:auto;top:32px;color:var(--muted);font-weight:500}
+.chip{position:absolute;left:0;top:0;width:196px;height:30px;border-radius:8px;background:#fff;border:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 8px 0 0;font:500 12px var(--body);white-space:nowrap;overflow:hidden;box-shadow:0 2px 6px rgba(20,32,58,.1);z-index:5;opacity:0}
+.chip .bar{width:5px;align-self:stretch;flex:none}
+.chip .app{font:600 9.5px var(--mono);color:var(--muted);text-transform:uppercase;flex:none}
+.chip .tx{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.chip .x{margin-left:auto;font:700 11px var(--mono);color:var(--needs);flex:none}
+.chip .s{margin-left:auto;font:600 11px var(--body);color:var(--ok);flex:none}
+.chip.u{background:#FDECEB;border-color:var(--urgent)}
+.chip.n{background:#E9F0FD;border-color:var(--needs)}
+.chip.l{background:#F0F2F5;border-color:var(--later)}
+.log{position:absolute;background:var(--term);border-radius:12px;color:#AEB9CF;font:500 12.5px/1.45 var(--mono);padding:10px 14px;overflow:hidden}
+.lh{font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:#7F8BA6;margin-bottom:4px}
+.ll div{white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.ll .k{color:var(--pass)}
+.ll .new{color:#fff}
+.safety{position:absolute;border-radius:12px;background:#fff;border:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:18px;z-index:4;opacity:0}
+.safety div{border-left:4px solid var(--ok);padding:2px 12px;font:600 16px/1.3 var(--body)}
+.safety small{display:block;font:400 12.5px/1.35 var(--body);color:var(--muted);margin-top:6px}
+
+/* wires, moving things */
+.wires{position:absolute;left:0;top:0}
+.w{fill:none;stroke:#B6C0D0;stroke-width:2}
+.w.hot{stroke:var(--pass);stroke-width:3.5}
+.w.red{stroke:var(--urgent);stroke-width:3.5}
+.wl{font:600 11px var(--mono);fill:var(--muted)}
+.env{position:absolute;left:0;top:0;height:26px;padding:0 10px;border-radius:13px;background:var(--remind);color:#fff;font:600 11.5px/26px var(--body);box-shadow:0 6px 14px rgba(20,32,58,.2);z-index:6;white-space:nowrap;opacity:0}
+.env.wa{background:var(--wa)}
+.env.reply{background:var(--ok)}
+.tap{position:absolute;left:0;top:0;width:36px;height:36px;border-radius:50%;background:rgba(244,180,0,.35);border:3px solid var(--pass);z-index:7;opacity:0}
+
+/* caption + overlays */
+.cap{position:absolute;background:#fff;border-radius:14px;border:1px solid var(--line);border-left:8px solid var(--pass);display:flex;align-items:center;gap:22px;padding:0 26px}
+.cap-step{font:600 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;min-width:96px}
+.cap-text{font:600 25px/1.25 var(--body)}
+.ov{position:absolute;inset:0;background:rgba(242,244,247,.92);display:flex;align-items:center;justify-content:center;z-index:10}
+.ov-card{width:1100px}
+.ov h2{font:800 64px/1.05 var(--display);margin:22px 0 16px;text-wrap:balance}
+.ov p{font:400 24px/1.4 var(--body);color:var(--muted);max-width:920px;margin:0}
+.ov .meta{margin-top:28px;font:500 16px var(--mono);color:var(--muted)}
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}
+.pillars div{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;border-top:5px solid var(--pass)}
+.pillars b{display:block;font:700 20px/1.2 var(--display)}
+.pillars span{display:block;margin-top:6px;font:15px/1.4 var(--body);color:var(--muted)}
+
+/* controls */
+#controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+button{font:600 14px var(--body);border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:8px 14px;cursor:pointer}
+button.pri{background:var(--ink);color:#fff;border-color:var(--ink);min-width:96px}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--needs);outline-offset:2px}
+#scrub{flex:1 1 280px;accent-color:var(--ink)}
+#time{font:500 14px var(--mono);color:var(--muted);min-width:110px;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.chips button{font-size:13px;padding:6px 10px}
+.chips button.cur{background:var(--pass);border-color:var(--pass)}
+.script{margin-top:16px}
+.script summary{cursor:pointer;font:600 15px var(--body)}
+.script ol{font:15px/1.6 var(--body);max-width:80ch;padding-left:22px}
+.script li span{font:500 13px var(--mono);color:var(--muted);margin-right:8px}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro">
+    <h1>How Hushbell works</h1>
+    <p>A 1:46 walkthrough: what the parent and the teacher see on their phones, and what the Hushbell backend does with each school message.</p>
+  </header>
+
+  <div id="wrap">
+  <div id="stage" role="img" aria-label="Animated walkthrough: a teacher sends school messages, the parent's phone stays silent on Do Not Disturb, Hushbell sorts them, calls the parent only for the fever message, replies to the teacher after the parent presses 1, and fills a permission form after one tap.">
+
+    <div class="topbar">
+      <div class="logo"><span class="pass">HUSHBELL</span><span class="logo-sub">an agent for school apps</span></div>
+      <div class="scene" id="scene"></div>
+      <div class="clock" id="clock"></div>
+    </div>
+
+    <svg class="wires" width="1600" height="900" viewBox="0 0 1600 900" aria-hidden="true">
+      <defs>
+        <marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#B6C0D0"/></marker>
+        <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F4B400"/></marker>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#D2433F"/></marker>
+      </defs>
+      <path class="w" id="wA1" d="M622,250 C652,250 650,190 678,190" marker-end="url(#ag)"/>
+      <text class="wl" x="628" y="236">USB</text>
+      <path class="w" id="w12" d="M881,190 L898,190" marker-end="url(#ag)"/>
+      <path class="w" id="w23" d="M1101,190 L1118,190" marker-end="url(#ag)"/>
+      <path class="w" id="w34" d="M1321,190 L1338,190" marker-end="url(#ag)"/>
+      <path class="w" id="wCall" d="M678,446 C640,446 655,334 624,334" marker-end="url(#ag)" style="opacity:0"/>
+      <text class="wl" id="wCallL" x="632" y="400" style="opacity:0">call</text>
+      <path class="w" id="wN5" d="M1115,495 C1115,505 1240,500 1240,510" marker-end="url(#ag)"/>
+      <path class="w" id="w56" d="M1119,554 L1102,554" marker-end="url(#ag)"/>
+      <path class="w" id="w6P" d="M679,554 L624,554" marker-end="url(#ag)"/>
+      <text class="wl" x="628" y="544">taps</text>
+    </svg>
+
+    <!-- teacher phone -->
+    <div class="phone" style="left:40px;top:96px">
+      <div class="screen">
+        <div class="sbar"><span class="ptime">10:42</span><span class="sb-r">Remind</span></div>
+        <div class="layer">
+          <div class="appbar remind"><div class="ab-t">Room 12 · 3rd grade</div><div class="ab-s">You are the teacher: Ms. Rivera</div></div>
+          <div class="thread">
+            <div class="bub out" id="tb1">Bake sale Friday! Bring cookies.</div>
+            <div class="bub out" id="tb2">Field trip form due TODAY: forms.gle/fieldtrip12</div>
+            <div class="bub out" id="tb3">Maya has a fever (101°F). Please pick her up by 1pm.</div>
+            <div class="bub in" id="tr"><small>Ana Lopez · Maya's mom</small>On my way, there by 12:30.</div>
+          </div>
+          <div class="compose"><div class="field" id="tField"></div><div class="sendbtn">Send</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="plabel" style="left:40px;top:668px"><b>Teacher's phone</b><span>A judge sends real Remind messages</span></div>
+
+    <!-- parent phone -->
+    <div class="phone" id="pPhone" style="left:350px;top:96px">
+      <div class="screen">
+        <div class="sbar"><span class="ptime">10:42</span>
+          <span class="sb-r">
+            <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4a8.5 8.5 0 1 0 11.5 11.5z" fill="#3B3F8F"/></svg>
+            <svg id="bellx" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6zm-2 15a2 2 0 0 0 4 0" fill="none" stroke="#5C6679" stroke-width="2"/><path d="M4 3l16 18" stroke="#D2433F" stroke-width="2.4"/></svg>
+          </span>
+        </div>
+
+        <div class="layer" id="Llock">
+          <div class="bigtime" id="bigTime">10:42</div>
+          <div class="date">Thursday, November 12</div>
+          <div class="dndpill"><svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4a8.5 8.5 0 1 0 11.5 11.5z" fill="#3B3F8F"/></svg>Do Not Disturb · In a meeting</div>
+          <div class="unread"><b id="unread">0</b> school notifications · silenced</div>
+          <div class="nlist" id="nlist"></div>
+        </div>
+
+        <div class="layer call" id="Lcall">
+          <div class="rings"><div class="ring" id="ring1"></div><div class="ring" id="ring2"></div><div class="avatar">HB</div></div>
+          <div class="cname">Hushbell</div>
+          <div class="csub" id="csub">Allowed through Do Not Disturb</div>
+          <div class="speech" id="speechBox"><small>HUSHBELL IS SPEAKING</small><span id="speech"></span></div>
+          <div class="keypad" id="keypad">
+            <div class="key" id="key1">1</div><div class="key">2</div><div class="key">3</div>
+            <div class="key">4</div><div class="key">5</div><div class="key">6</div>
+            <div class="key">7</div><div class="key">8</div><div class="key">9</div>
+            <div class="key">*</div><div class="key">0</div><div class="key">#</div>
+          </div>
+          <div class="cbtns" id="cbtns"><div class="cb dec"><span>Decline</span></div><div class="cb acc"><span>Answer</span></div></div>
+        </div>
+
+        <div class="layer" id="Lchat">
+          <div class="appbar remind"><div class="ab-t">Ms. Rivera</div><div class="ab-s">Room 12 · Remind</div></div>
+          <div class="agentbar" id="agentbar">Hushbell is using Remind · step <span id="aStep">1</span>/6</div>
+          <div class="cmsg in" style="top:96px">Maya has a fever (101°F). Please pick her up by 1pm.<small>10:42</small></div>
+          <div class="cmsg out" id="cOut" style="top:214px">On my way, there by 12:30.<small>10:43 · sent after you pressed 1</small></div>
+          <div class="compose"><div class="field" id="cField"></div><div class="sendbtn">Send</div></div>
+        </div>
+
+        <div class="layer" id="Lpass">
+          <div class="hp-head"><span class="pass sm">HUSHBELL</span><span>Today</span></div>
+          <div class="sec" style="top:60px">Needs you · 1</div>
+          <div class="card needs" style="top:80px">
+            <div class="ct">Field trip permission form</div>
+            <div class="cm">Due today · Remind + WhatsApp · Maya</div>
+            <div class="cr">Why: a parent has to sign it today.</div>
+            <div class="btns" id="needBtns"><div class="btn pri">Approve</div><div class="btn">Skip</div></div>
+            <div class="approved" id="approved">Approved ✓ Filling the form…</div>
+          </div>
+          <div class="sec" style="top:218px">Handled · 1</div>
+          <div class="card done" style="top:238px"><div class="ct">Maya: fever, pick up by 1pm</div><div class="cm">You pressed 1 · reply sent 10:43</div></div>
+          <div class="sec" style="top:314px">Later · 20</div>
+          <div class="card later" style="top:334px"><div class="ct">Bake sale, picture day, newsletters</div><div class="cm">In your 6 pm digest</div></div>
+        </div>
+
+        <div class="layer" id="Lform">
+          <div class="urlbar">docs.google.com/forms/fieldtrip12</div>
+          <div class="fhead"><div class="ft">Field trip permission</div><div class="fs">Lincoln Elementary · Room 12 · Ms. Rivera</div></div>
+          <div class="flabel" style="top:124px">Student name</div><div class="finput" id="f1" style="top:142px"></div>
+          <div class="flabel" style="top:184px">Parent or guardian</div><div class="finput" id="f2" style="top:202px"></div>
+          <div class="flabel" style="top:244px">Trip</div><div class="finput" style="top:262px">Science museum · Fri, Nov 20</div>
+          <div class="fcheck" style="top:300px"><div class="cbx" id="fbox"></div><span>I give permission for my child to go</span></div>
+          <div class="fsubmit" style="top:356px">Submit</div>
+          <div class="fdone" id="fdone">Your response has been recorded ✓</div>
+          <div class="agentbar" id="agentbar2" style="top:474px">Hushbell is filling this form · step <span id="aStep2">1</span>/7</div>
+        </div>
+
+        <div class="layer" id="Lsum">
+          <div class="hp-head"><span class="pass sm">HUSHBELL</span><span>6:00 PM digest</span></div>
+          <div class="stats">
+            <div><b id="sMsgs">23</b><span>school messages</span></div>
+            <div><b>1</b><span>call to you</span></div>
+            <div><b>1</b><span>tap from you</span></div>
+            <div><b>0</b><span>school apps you opened</span></div>
+          </div>
+          <div class="sec" style="top:220px">Tonight's digest</div>
+          <div class="dig">
+            <div class="di"><i class="dot ok"></i>Maya: fever, you replied at 10:43</div>
+            <div class="di"><i class="dot ok"></i>Field trip form: signed</div>
+            <div class="di"><i class="dot later"></i>Bake sale Friday: bring cookies</div>
+            <div class="di"><i class="dot later"></i>Picture day Thursday: in your calendar</div>
+            <div class="di muted">+ 18 more you can skip</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="plabel" style="left:350px;top:668px"><b>Parent's phone</b><span>Do Not Disturb on · USB to the laptop</span></div>
+
+    <!-- backend -->
+    <div class="brain" style="left:660px;top:84px;width:900px;height:690px">
+      <div class="bt">Hushbell brain</div><div class="bs">runs on a laptop · connected to the parent's phone by USB</div>
+    </div>
+
+    <div class="box" id="a1" style="left:680px;top:140px;width:200px;height:100px"><div class="n">① READ</div><div class="h">Read the phone</div><div class="d">notifications over USB</div><div class="tag">adb</div><div class="st" id="a1s"></div></div>
+    <div class="box" id="a2" style="left:900px;top:140px;width:200px;height:100px"><div class="n">② TIDY</div><div class="h">Who and which child</div><div class="d">merge duplicates</div><div class="tag">dedupe</div><div class="st" id="a2s"></div></div>
+    <div class="box" id="a3" style="left:1120px;top:140px;width:200px;height:100px"><div class="n">③ SAFETY RULES</div><div class="h">Fixed words first</div><div class="d">fever · hurt · pick up</div><div class="tag">rules</div><div class="st" id="a3s"></div></div>
+    <div class="box" id="a4" style="left:1340px;top:140px;width:200px;height:100px"><div class="n">④ SORT</div><div class="h">Claude decides</div><div class="d">urgent · needs you · later</div><div class="tag">Claude</div><div class="st" id="a4s"></div></div>
+
+    <div class="box lane u" id="lU" style="left:680px;top:398px;width:280px;height:96px"><div class="h u">URGENT</div><div class="d">Call her, through Do Not Disturb</div><div class="tag">Twilio</div><div class="st" id="lUs"></div></div>
+    <div class="box lane n" id="lN" style="left:975px;top:398px;width:280px;height:96px"><div class="h n">NEEDS YOU</div><div class="d">One card on the Hushbell page</div><div class="tag">web page</div><div class="st" id="lNs"></div></div>
+    <div class="box lane l" id="lL" style="left:1270px;top:398px;width:280px;height:96px"><div class="h l">LATER</div><div class="d">6 pm digest and calendar</div><div class="tag">digest</div><div class="st" id="lLs"></div></div>
+
+    <div class="box" id="b6" style="left:680px;top:512px;width:420px;height:84px"><div class="n">⑥ ACT IN THE APP</div><div class="h">Taps and types on her phone</div><div class="tag">Mobilerun</div><div class="st" id="b6s"></div></div>
+    <div class="box" id="b5" style="left:1120px;top:512px;width:420px;height:84px"><div class="n">⑤ WAIT FOR HER OK</div><div class="h">Nothing is sent without a yes</div><div class="tag">LangGraph interrupt()</div><div class="st" id="b5s"></div></div>
+
+    <div class="log" style="left:680px;top:610px;width:860px;height:150px"><div class="lh">Live log</div><div class="ll" id="logLines"></div></div>
+    <div class="safety" id="safety" style="left:680px;top:610px;width:860px;height:150px">
+      <div>Never sends, signs or pays without her OK<small>LangGraph pauses every risky step until she says yes.</small></div>
+      <div>Safety rules run before any AI<small>Fever, hurt, pick up, early dismissal and lockdown are caught by fixed rules.</small></div>
+      <div>Every action is logged<small>She can see what the agent did, and why.</small></div>
+    </div>
+
+    <!-- moving pieces -->
+    <div class="chip" id="m1"><i class="bar" style="background:var(--remind)"></i><span class="app">Remind</span><span class="tx">Bake sale Friday</span><span class="s" id="m1s"></span></div>
+    <div class="chip" id="m2"><i class="bar" style="background:var(--remind)"></i><span class="app">Remind</span><span class="tx">Field trip form due today</span><span class="x" id="m2x">×2</span><span class="s" id="m2s"></span></div>
+    <div class="chip" id="m3"><i class="bar" style="background:var(--wa)"></i><span class="app">WhatsApp</span><span class="tx">Field trip form due today</span></div>
+    <div class="chip" id="m4"><i class="bar" style="background:var(--remind)"></i><span class="app">Remind</span><span class="tx">Maya has a fever</span><span class="s" id="m4s"></span></div>
+
+    <div class="env" id="e1">Remind · Ms. Rivera</div>
+    <div class="env" id="e2">Remind · Ms. Rivera</div>
+    <div class="env wa" id="e3">WhatsApp · another parent</div>
+    <div class="env" id="e4">Remind · Ms. Rivera</div>
+    <div class="env reply" id="er">“On my way, there by 12:30.”</div>
+    <div class="tap" id="tap"></div>
+
+    <div class="cap" style="left:40px;top:792px;width:1520px;height:84px"><div class="cap-step" id="capStep"></div><div class="cap-text" id="capText"></div></div>
+
+    <div class="ov" id="ovTitle">
+      <div class="ov-card">
+        <span class="pass">HUSHBELL</span>
+        <h2>Your phone is on Do Not Disturb. Your agent isn't.</h2>
+        <p>Hushbell reads every school app on a parent's phone, handles the noise, and gets only one thing through: your kid needs you.</p>
+        <div class="meta">How it works · 1:46</div>
+      </div>
+    </div>
+    <div class="ov" id="ovEnd" style="opacity:0">
+      <div class="ov-card">
+        <span class="pass">HUSHBELL</span>
+        <h2>Hushed all day. Rings when your kid needs you.</h2>
+        <div class="pillars">
+          <div><b>Reads inside the apps</b><span>No school login or email forwarding. If it reaches the phone, Hushbell sees it.</span></div>
+          <div><b>Acts after her OK</b><span>Replies to teachers and fills forms in the real apps, only after a yes.</span></div>
+          <div><b>The only call through DND</b><span>Urgent means a call. Everything else waits for the digest.</span></div>
+        </div>
+        <div class="meta">Android + Mobilerun · LangGraph · Claude · Twilio · Do Not Disturb Hackathon, Nov 13, 2026<br>Open source: github.com/SriVarshini09/Hushbell</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <div id="controls">
+    <button class="pri" id="playBtn" type="button">Play</button>
+    <button id="restartBtn" type="button">Restart</button>
+    <input id="scrub" type="range" min="0" max="1060" step="1" value="0" aria-label="Position in the walkthrough">
+    <span id="time">0:00 / 1:46</span>
+    <div class="chips" id="sceneChips"></div>
+  </div>
+
+  <details class="script">
+    <summary>Narration script</summary>
+    <ol id="scriptList"></ol>
+  </details>
+</main>
+
+<script>
+(() => {
+const D = 106;
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const prog = (t, a, b) => ease(clamp((t - a) / (b - a)));
+const win = (t, a, b, f = .3) => Math.min(prog(t, a, a + f), b == null ? 1 : 1 - prog(t, b - f, b));
+const inW = (t, a, b) => t >= a && t < b;
+function along(t, pts) {
+  if (t <= pts[0][0]) return { x: pts[0][1], y: pts[0][2], s: pts[0][3] ?? 1 };
+  for (let i = 1; i < pts.length; i++) {
+    if (t <= pts[i][0]) {
+      const a = pts[i - 1], b = pts[i], p = ease(clamp((t - a[0]) / (b[0] - a[0])));
+      const sa = a[3] ?? 1, sb = b[3] ?? 1;
+      return { x: a[1] + (b[1] - a[1]) * p, y: a[2] + (b[2] - a[2]) * p, s: sa + (sb - sa) * p };
+    }
+  }
+  const l = pts[pts.length - 1];
+  return { x: l[1], y: l[2], s: l[3] ?? 1 };
+}
+const put = (el, x, y, s = 1, o = 1) => { el.style.transform = `translate(${x}px,${y}px) scale(${s})`; el.style.opacity = o; };
+const typed = (t, a, b, s) => t < a ? '' : s.slice(0, Math.round(s.length * clamp((t - a) / (b - a))));
+const tail = (s, n = 26) => s.length > n ? '…' + s.slice(-(n - 1)) : s;
+const tog = (el, cls, v) => el.classList.toggle(cls, !!v);
+const show = (el, v) => { el.style.display = v ? '' : 'none'; };
+
+/* ---------- notifications on the parent's phone ---------- */
+const APPS = { remind: ['R', 'Remind', 'var(--remind)'], dojo: ['C', 'ClassDojo', 'var(--dojo)'], wa: ['W', 'WhatsApp', 'var(--wa)'], gmail: ['G', 'Gmail', 'var(--gmail)'], bw: ['B', 'Brightwheel', 'var(--bw)'] };
+const NOISE = [
+  ['dojo', 'Mr. Chen', 'New photo from art class'],
+  ['remind', 'PTA', 'Spirit week starts Monday'],
+  ['bw', 'Little Oaks Daycare', 'Leo checked in at 8:05 AM'],
+  ['gmail', 'Lincoln Elementary', 'Weekly newsletter: Nov 12'],
+  ['wa', '3rd grade parents', 'Anyone have the spelling list?'],
+  ['dojo', 'Ms. Rivera', 'Maya earned a point for teamwork'],
+  ['remind', 'Coach Diaz', 'Practice moved to field B'],
+  ['gmail', 'PTA', 'Volunteers needed for the book fair'],
+  ['wa', '3rd grade parents', 'Who is bringing napkins Friday?'],
+  ['bw', 'Little Oaks Daycare', 'New photo of Leo'],
+  ['dojo', 'Class story', 'Our pumpkin experiment'],
+  ['gmail', 'District office', 'School board agenda'],
+  ['remind', 'Library', 'Book fair this week'],
+  ['wa', '3rd grade parents', 'Thanks Jen!'],
+  ['dojo', 'Mr. Chen', 'Library books due Monday'],
+  ['gmail', 'Lincoln Elementary', 'Picture day is Thursday'],
+  ['bw', 'Little Oaks Daycare', 'Leo ate all his lunch'],
+  ['wa', '3rd grade parents', 'Same here'],
+  ['remind', 'PTA', 'Fundraiser total so far: $1,240']
+];
+const ROWS = NOISE.map((r, i) => ({ app: r[0], who: r[1], txt: r[2], t: 7.0 + i * 0.4, when: `${8 + Math.floor(i / 7)}:${String(5 + (i % 7) * 8).padStart(2, '0')}` }));
+ROWS.push(
+  { app: 'remind', who: 'Ms. Rivera', txt: 'Bake sale Friday! Bring cookies.', t: 19.0, when: 'now' },
+  { app: 'remind', who: 'Ms. Rivera', txt: 'Field trip form due TODAY', t: 22.0, when: 'now' },
+  { app: 'wa', who: '3rd grade parents', txt: 'Reminder: field trip form due today!', t: 23.2, when: 'now' },
+  { app: 'remind', who: 'Ms. Rivera', txt: 'Maya has a fever (101°F). Please pick her up by 1pm.', t: 27.2, when: 'now' }
+);
+const nlist = $('nlist');
+ROWS.forEach(r => {
+  const a = APPS[r.app];
+  const el = document.createElement('div');
+  el.className = 'nrow';
+  el.innerHTML = `<i class="ai" style="background:${a[2]}">${a[0]}</i><div class="nb"><div class="nt"><b>${a[1]}</b><span>· ${r.who}</span><span>${r.when}</span></div><div class="nx"></div></div>`;
+  el.querySelector('.nx').textContent = r.txt;
+  nlist.appendChild(el);
+  r.el = el;
+});
+const ARRIVALS = ROWS.map(r => r.t);
+
+/* ---------- script ---------- */
+const SCENES = [[6, 'The problem'], [16, 'Messages arrive'], [30, 'Read'], [40, 'Sort'], [58, 'Urgent call'], [78, 'Needs you'], [90, 'Result']];
+const CAP = [
+  [6, 11, 1, 'Maya’s mom is in meetings all morning. Her phone is on Do Not Disturb.'],
+  [11, 16, 1, 'School messages pile up across five apps. One of them will matter.'],
+  [16, 23, 2, 'A judge plays the teacher and sends real messages from Remind.'],
+  [23, 30, 2, 'Another parent reposts one in WhatsApp. The phone stays silent.'],
+  [30, 35, 3, 'Hushbell reads each notification from the phone over USB.'],
+  [35, 40, 3, 'No school login, no email forwarding: if it reaches the phone, Hushbell sees it.'],
+  [40, 45, 4, 'First it tidies up. The same news from two apps becomes one item.'],
+  [45, 50, 4, 'Fixed safety rules run before any AI, so “fever” is never missed.'],
+  [50, 58, 4, 'Claude sorts the rest and writes a one-line reason for each.'],
+  [58, 62, 5, 'Urgent: Hushbell calls her. It’s the only caller allowed through Do Not Disturb.'],
+  [62, 67, 5, 'She hears the summary and presses 1.'],
+  [67, 73, 5, 'The agent opens Remind on her own phone and types the reply.'],
+  [73, 78, 5, 'The teacher gets it: “On my way, there by 12:30.”'],
+  [78, 83, 6, 'At lunch she checks Hushbell once. One thing needs her.'],
+  [83, 90, 6, 'She taps Approve. The agent fills the permission form in the browser.'],
+  [90, 95, 7, '23 school messages became 1 call and 1 tap.'],
+  [95, 100, 7, 'Nothing is sent, signed or paid without her OK. Every action is logged.']
+];
+const LOG = [
+  [31.0, '10:42:31', 'read  ', 'remind     "Bake sale Friday! Bring cookies."'],
+  [32.0, '10:42:32', 'read  ', 'remind     "Field trip form due TODAY"'],
+  [33.0, '10:42:33', 'read  ', 'whatsapp   "Reminder: field trip form due today!"'],
+  [34.0, '10:42:34', 'read  ', 'remind     "Maya has a fever (101°F). Please pick her up by 1pm."'],
+  [43.2, '10:42:43', 'tidy  ', 'merged 2 → 1: field trip form (remind + whatsapp), child = Maya'],
+  [46.8, '10:42:46', 'rules ', 'MATCH "fever", "pick her up" → URGENT (no AI needed)'],
+  [47.4, '10:42:47', 'rules ', 'no match: bake sale, field trip form → send to Claude'],
+  [53.4, '10:42:53', 'claude', 'LATER      bake sale: fundraiser, no deadline'],
+  [53.8, '10:42:53', 'claude', 'NEEDS YOU  field trip form: a parent must sign today'],
+  [58.4, '10:42:58', 'twilio', 'calling Mom: the only caller allowed through Do Not Disturb'],
+  [66.1, '10:43:06', 'twilio', 'keypress 1 → reply "On my way, there by 12:30."'],
+  [66.6, '10:43:07', 'graph ', 'resume thread=fever-maya approved=true'],
+  [67.7, '10:43:08', 'phone ', 'mobilerun replay reply-in-remind (6 steps)'],
+  [73.3, '10:43:14', 'phone ', 'step 6/6 tap Send ✓'],
+  [75.1, '10:43:15', 'done  ', 'teacher received the reply'],
+  [80.7, '12:05:02', 'page  ', 'Approve: field trip form'],
+  [81.2, '12:05:03', 'graph ', 'resume thread=field-trip approved=true'],
+  [82.7, '12:05:04', 'phone ', 'mobilerun replay fill-permission-form (7 steps)'],
+  [87.9, '12:05:09', 'phone ', 'step 7/7 Submit ✓ response recorded'],
+  [90.4, '18:00:00', 'digest', "23 messages → 1 call, 1 tap, 20 in tonight's digest"]
+];
+
+/* ---------- moving pieces ---------- */
+const S = [682, 902, 1122, 1342], Y = k => 256 + k * 33;
+const U = [722, 454], N = [1017, 454], L = [1312, 454];
+const SRC = [400, 300, .6];
+const CHIPS = {
+  m1: { show: 30.4, path: [[30.4, ...SRC], [31.2, S[0], Y(0), 1], [40.4, S[0], Y(0)], [41.4, S[1], Y(0)], [45.4, S[1], Y(0)], [46.2, S[2], Y(0)], [50.0, S[2], Y(0)], [50.8, S[3], Y(0)], [53.4, S[3], Y(0)], [54.6, L[0], L[1]]] },
+  m2: { show: 31.4, path: [[31.4, ...SRC], [32.2, S[0], Y(1), 1], [40.6, S[0], Y(1)], [41.6, S[1], Y(1)], [45.6, S[1], Y(1)], [46.4, S[2], Y(1)], [50.2, S[2], Y(1)], [51.0, S[3], Y(1)], [53.8, S[3], Y(1)], [55.0, N[0], N[1]]] },
+  m3: { show: 32.4, hide: 43.5, path: [[32.4, ...SRC], [33.2, S[0], Y(2), 1], [40.8, S[0], Y(2)], [41.8, S[1], Y(2)], [42.6, S[1], Y(2)], [43.4, S[1], Y(1)]] },
+  m4: { show: 33.4, path: [[33.4, ...SRC], [34.2, S[0], Y(3), 1], [41.0, S[0], Y(3)], [42.0, S[1], Y(3)], [43.6, S[1], Y(3)], [44.2, S[1], Y(2)], [45.8, S[1], Y(2)], [46.6, S[2], Y(2)], [47.8, S[2], Y(2)], [49.0, U[0], U[1]]] }
+};
+const ENVS = [
+  ['e1', 18.4, 19.0, [140, 590], [400, 300]],
+  ['e2', 21.4, 22.0, [140, 590], [400, 300]],
+  ['e3', 22.6, 23.2, [560, 40], [400, 300]],
+  ['e4', 26.6, 27.2, [140, 590], [400, 300]],
+  ['er', 73.5, 75.0, [390, 330], [80, 420]]
+];
+const TEACH = [
+  { el: 'tb1', s: 'Bake sale Friday! Bring cookies.', a: 16.6, b: 18.2, send: 18.4 },
+  { el: 'tb2', s: 'Field trip form due TODAY: forms.gle/fieldtrip12', a: 19.4, b: 21.2, send: 21.4 },
+  { el: 'tb3', s: 'Maya has a fever (101°F). Please pick her up by 1pm.', a: 24.0, b: 26.4, send: 26.6 }
+];
+const TAPS = [[62.0, 542, 572], [66.0, 419, 481], [68.6, 458, 606], [73.0, 576, 606], [80.6, 430, 311], [83.8, 485, 290], [85.3, 485, 350], [86.8, 384, 444], [87.3, 422, 508]];
+const SPEECH = 'Hi, it’s Hushbell. Maya’s teacher says she has a fever and needs to be picked up by 1 pm. Press 1 to reply “On my way, there by 12:30.” Press 2 to call the school.';
+const wCall = $('wCall'), wCallLen = wCall.getTotalLength();
+wCall.style.strokeDasharray = wCallLen;
+
+function clockFor(t) {
+  if (t < 60) return ['10:42', 'Thu 10:42 AM · Mom is in a meeting'];
+  if (t < 78) return ['10:43', 'Thu 10:43 AM · Mom is in a meeting'];
+  if (t < 90) return ['12:05', 'Thu 12:05 PM · Lunch break'];
+  return ['6:00', 'Thu 6:00 PM · Evening digest'];
+}
+const layerWin = { Llock: [-1, 58.5], Lcall: [58.5, 67.8], Lchat: [67.8, 78.3], Lpass: [78.3, 83.3], Lform: [83.3, 90], Lsum: [90, 999] };
+
+function wire(id, hot, red) {
+  const el = $(id);
+  el.setAttribute('class', 'w' + (red ? ' red' : hot ? ' hot' : ''));
+  el.setAttribute('marker-end', red ? 'url(#ar)' : hot ? 'url(#ah)' : 'url(#ag)');
+}
+
+function render(t) {
+  /* top bar + clock */
+  const ck = clockFor(t);
+  document.querySelectorAll('.ptime').forEach(e => e.textContent = ck[0]);
+  $('bigTime').textContent = ck[0];
+  $('clock').textContent = t < 6 ? '' : ck[1];
+  let sc = '';
+  SCENES.forEach((s, i) => { if (t >= s[0] && t < 100) sc = `${i + 1} · ${s[1]}`; });
+  $('scene').textContent = sc;
+
+  /* captions */
+  const c = CAP.find(c => t >= c[0] && t < c[1]);
+  $('capText').textContent = c ? c[3] : '';
+  $('capStep').textContent = c ? `Step ${c[2]} of 7` : '';
+  $('capText').style.opacity = c ? win(t, c[0], c[1], .25) : 0;
+
+  /* overlays */
+  $('ovTitle').style.opacity = 1 - prog(t, 5.3, 6.0);
+  $('ovTitle').style.visibility = t >= 6 ? 'hidden' : 'visible';
+  $('ovEnd').style.opacity = prog(t, 100, 100.8);
+  $('ovEnd').style.visibility = t < 100 ? 'hidden' : 'visible';
+
+  /* teacher phone */
+  let fieldTxt = '';
+  TEACH.forEach(m => {
+    show($(m.el), t >= m.send);
+    if (t >= m.a && t < m.send) fieldTxt = typed(t, m.a, m.b, m.s);
+  });
+  $('tField').textContent = tail(fieldTxt);
+  show($('tr'), t >= 75.0);
+  tog($('tr'), 'hl', inW(t, 75.0, 78));
+
+  /* parent phone layers */
+  for (const [id, w] of Object.entries(layerWin)) {
+    const o = Math.min(prog(t, w[0], w[0] + .3), 1 - prog(t, w[1], w[1] + .3));
+    const el = $(id);
+    el.style.opacity = o;
+    el.style.visibility = o > 0.001 ? 'visible' : 'hidden';
+    el.style.zIndex = t >= w[0] ? 2 : 1;
+  }
+  const shake = inW(t, 58.6, 62.0) ? Math.sin(t * 50) * 2.5 : 0;
+  $('pPhone').style.transform = `translateX(${shake}px)`;
+
+  /* lock screen rows */
+  let count = 0;
+  ROWS.forEach(r => {
+    if (t < r.t) { r.el.style.opacity = 0; return; }
+    count++;
+    let slot = 0;
+    ROWS.forEach(o => { if (o.t > r.t && t >= o.t) slot += prog(t, o.t, o.t + .35); });
+    const y = slot * 52;
+    r.el.style.transform = `translateY(${y}px)`;
+    r.el.style.opacity = y > 360 ? 0 : prog(t, r.t, r.t + .35);
+  });
+  $('unread').textContent = count;
+  const lastArr = ARRIVALS.filter(a => a <= t).pop();
+  const pulse = lastArr != null && t - lastArr < .5 ? 1 + .45 * Math.sin(Math.PI * (t - lastArr) / .5) : 1;
+  $('bellx').style.transform = `scale(${pulse})`;
+
+  /* call */
+  [['ring1', 0], ['ring2', .5]].forEach(([id, off]) => {
+    const ph = ((t * 1.1 + off) % 1);
+    const ringing = inW(t, 58.5, 62.1);
+    $(id).style.transform = `scale(${1 + ph * .7})`;
+    $(id).style.opacity = ringing ? (1 - ph) * .9 : 0;
+  });
+  $('cbtns').style.opacity = 1 - prog(t, 62.1, 62.4);
+  $('csub').textContent = t < 62.2 ? 'Allowed through Do Not Disturb' : `Connected · 0:${String(Math.floor(t - 62.2)).padStart(2, '0')}`;
+  $('speechBox').style.opacity = prog(t, 62.3, 62.6);
+  $('speech').textContent = typed(t, 62.4, 65.6, SPEECH);
+  $('keypad').style.opacity = prog(t, 62.6, 63.0);
+  tog($('key1'), 'hl', inW(t, 66.0, 66.7));
+
+  /* Remind chat */
+  $('agentbar').style.opacity = win(t, 67.8, 74.0);
+  $('aStep').textContent = clamp(1 + Math.floor((t - 67.6) / (5.8 / 6)), 1, 6);
+  $('cField').textContent = t < 73.1 ? tail(typed(t, 69.0, 72.6, 'On my way, there by 12:30.')) : '';
+  $('cOut').style.opacity = prog(t, 73.2, 73.5);
+
+  /* Hushbell page */
+  $('needBtns').style.opacity = 1 - prog(t, 80.8, 81.0);
+  $('approved').style.opacity = prog(t, 80.9, 81.2);
+
+  /* form */
+  $('agentbar2').style.opacity = win(t, 83.3, 88.3);
+  $('aStep2').textContent = clamp(1 + Math.floor((t - 82.6) / (5.3 / 7)), 1, 7);
+  $('f1').textContent = typed(t, 84.0, 85.2, 'Maya Lopez');
+  $('f2').textContent = typed(t, 85.4, 86.4, 'Ana Lopez');
+  tog($('f1'), 'focus', inW(t, 83.8, 85.3));
+  tog($('f2'), 'focus', inW(t, 85.3, 86.6));
+  tog($('fbox'), 'on', t >= 86.9);
+  $('fbox').textContent = t >= 86.9 ? '✓' : '';
+  $('fdone').style.opacity = prog(t, 87.8, 88.1);
+
+  /* summary */
+  $('sMsgs').textContent = Math.round(23 * prog(t, 90.2, 91.4));
+
+  /* backend boxes */
+  const arrived = [31.2, 32.2, 33.2, 34.2].filter(x => t >= x).length;
+  tog($('a1'), 'on', inW(t, 30.4, 40.4));
+  $('a1s').textContent = t < 30.4 ? 'waiting' : `${arrived} new`;
+  tog($('a2'), 'on', inW(t, 40.4, 45.4));
+  $('a2s').textContent = t < 40.4 ? '' : t < 43.3 ? 'checking…' : 'merged 2 → 1';
+  tog($('a3'), 'on', inW(t, 45.4, 50.0));
+  tog($('a3'), 'hit', inW(t, 46.8, 48.6));
+  $('a3s').textContent = t < 45.4 ? '' : t < 46.8 ? 'checking…' : '1 match: fever';
+  tog($('a4'), 'on', inW(t, 50.0, 55.2));
+  $('a4s').textContent = t < 50 ? '' : t < 53.3 ? 'thinking…' : '2 sorted';
+  tog($('lU'), 'on', inW(t, 48.6, 76));
+  $('lUs').textContent = t >= 49 ? '1' : '';
+  tog($('lN'), 'on', inW(t, 54.8, 89));
+  $('lNs').textContent = t >= 55 ? '1' : '';
+  tog($('lL'), 'on', inW(t, 54.4, 56) || inW(t, 90, 100));
+  $('lLs').textContent = t >= 54.6 ? '20' : '19';
+  const fWait = inW(t, 55.0, 81.0), uWait = inW(t, 58.5, 66.2);
+  tog($('b5'), 'wait', (fWait || uWait) && !inW(t, 66.2, 67.6));
+  tog($('b5'), 'on', inW(t, 66.2, 67.6) || inW(t, 81.0, 82.6));
+  $('b5s').textContent =
+    t < 55 ? 'nothing waiting' :
+    t < 58.5 ? 'paused: field trip form' :
+    t < 66.2 ? 'paused: fever reply, field trip form' :
+    t < 67.6 ? 'resumed: fever reply ✓ (she pressed 1)' :
+    t < 81.0 ? 'paused: field trip form' :
+    t < 82.6 ? 'resumed: field trip form ✓ (she tapped Approve)' : 'nothing waiting';
+  tog($('b6'), 'on', inW(t, 67.6, 73.6) || inW(t, 82.6, 88.0));
+  $('b6s').textContent =
+    t < 67.6 ? 'idle' :
+    t < 73.4 ? `reply-in-remind · step ${clamp(1 + Math.floor((t - 67.6) / (5.8 / 6)), 1, 6)}/6` :
+    t < 82.6 ? 'done ✓ reply sent' :
+    t < 87.9 ? `fill-permission-form · step ${clamp(1 + Math.floor((t - 82.6) / (5.3 / 7)), 1, 7)}/7` : 'done ✓ form submitted';
+
+  /* wires */
+  wire('wA1', inW(t, 30.2, 35));
+  wire('w12', inW(t, 40.4, 41.8));
+  wire('w23', inW(t, 45.4, 46.6));
+  wire('w34', inW(t, 50.0, 51.2));
+  wire('wN5', inW(t, 80.8, 82.0));
+  wire('w56', inW(t, 66.6, 67.8) || inW(t, 81.8, 83.0));
+  wire('w6P', inW(t, 67.6, 73.6) || inW(t, 82.6, 88.0));
+  const callOn = inW(t, 58.2, 66.5);
+  wire('wCall', false, true);
+  wCall.style.opacity = callOn ? 1 : 0;
+  wCall.style.strokeDashoffset = wCallLen * (1 - prog(t, 58.2, 59.2));
+  $('wCallL').style.opacity = callOn ? 1 : 0;
+
+  /* chips */
+  for (const [id, c] of Object.entries(CHIPS)) {
+    const p = along(t, c.path);
+    let o = t < c.show ? 0 : prog(t, c.show, c.show + .3);
+    if (c.hide) o = Math.min(o, 1 - prog(t, c.hide - .4, c.hide));
+    put($(id), p.x, p.y, p.s, o);
+  }
+  tog($('m4'), 'u', t >= 46.8);
+  tog($('m1'), 'l', t >= 53.4);
+  tog($('m2'), 'n', t >= 53.8);
+  $('m2x').style.display = t >= 43.4 ? '' : 'none';
+  $('m4s').textContent = t >= 75.2 ? '✓ replied' : '';
+  $('m2s').textContent = t >= 88.0 ? '✓ signed' : '';
+  $('m2x').style.display = t >= 43.4 && t < 88.0 ? '' : 'none';
+  $('m1s').textContent = '';
+
+  /* envelopes */
+  ENVS.forEach(([id, a, b, from, to]) => {
+    const el = $(id);
+    if (t < a || t > b + .2) { el.style.opacity = 0; return; }
+    const p = along(t, [[a, from[0], from[1], .8], [b, to[0], to[1], 1]]);
+    put(el, p.x, p.y, p.s, Math.min(prog(t, a, a + .15), 1 - prog(t, b, b + .2)));
+  });
+
+  /* taps */
+  const tp = TAPS.find(x => t >= x[0] - .05 && t < x[0] + .55);
+  if (tp) { const k = clamp((t - tp[0] + .05) / .6); put($('tap'), tp[1] - 18, tp[2] - 18, .6 + k * .8, 1 - k); }
+  else $('tap').style.opacity = 0;
+
+  /* log + safety */
+  const lines = LOG.filter(l => l[0] <= t).slice(-6);
+  $('logLines').innerHTML = lines.map(l => `<div class="${t - l[0] < 1.2 ? 'new' : ''}">${l[1]}  <span class="k">${l[2]}</span>  ${l[3].replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`).join('');
+  $('safety').style.opacity = prog(t, 94.6, 95.2);
+}
+
+/* ---------- playback ---------- */
+let t = 0, playing = false, last = null;
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const chipsEl = $('sceneChips');
+SCENES.forEach(([st, name], i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = `${i + 1}. ${name}`;
+  b.addEventListener('click', () => { seek(st); });
+  chipsEl.appendChild(b);
+});
+CAP.forEach(c => {
+  const li = document.createElement('li');
+  li.innerHTML = `<span>${fmt(c[0])}</span>`;
+  li.appendChild(document.createTextNode(c[3]));
+  $('scriptList').appendChild(li);
+});
+function syncUI() {
+  $('scrub').value = Math.round(t * 10);
+  $('time').textContent = `${fmt(t)} / ${fmt(D)}`;
+  $('playBtn').textContent = playing ? 'Pause' : (t >= D ? 'Replay' : 'Play');
+  [...chipsEl.children].forEach((b, i) => {
+    const a = SCENES[i][0], z = i + 1 < SCENES.length ? SCENES[i + 1][0] : 100;
+    b.classList.toggle('cur', t >= a && t < z);
+  });
+}
+function frame(ts) {
+  if (!playing) { last = null; return; }
+  if (last != null) t += (ts - last) / 1000;
+  last = ts;
+  if (t >= D) { t = D; playing = false; }
+  render(t); syncUI();
+  if (playing) requestAnimationFrame(frame);
+}
+function play() { if (t >= D) t = 0; playing = true; last = null; syncUI(); requestAnimationFrame(frame); }
+function pause() { playing = false; syncUI(); }
+function seek(x) { t = clamp(x, 0, D); render(t); syncUI(); }
+$('playBtn').addEventListener('click', () => playing ? pause() : play());
+$('restartBtn').addEventListener('click', () => { seek(0); play(); });
+$('scrub').addEventListener('input', e => { pause(); seek(e.target.value / 10); });
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); playing ? pause() : play(); }
+});
+
+/* ---------- scale to fit ---------- */
+const wrap = $('wrap'), stage = $('stage');
+function fit() {
+  const w = document.body.classList.contains('capture') ? 1600 : wrap.clientWidth;
+  const s = w / 1600;
+  stage.style.transform = `scale(${s})`;
+  wrap.style.height = `${900 * s}px`;
+}
+window.addEventListener('resize', fit);
+if ('ResizeObserver' in window) new ResizeObserver(fit).observe(wrap);
+fit();
+render(0); syncUI();
+
+window.HP = {
+  ready: false, D,
+  seek: x => { playing = false; t = clamp(x, 0, D); render(t); },
+  capture: () => { playing = false; document.body.classList.add('capture'); fit(); render(t); }
+};
+const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(() => {
+  window.HP.ready = true;
+  render(t);
+  if (!reduced && !navigator.webdriver) play();
+});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Hushbell</title>
+<style>
+:root{
+  /* School-bus yellow bell on cool paper; red/blue/grey only for urgent / needs you / later. */
+  --paper:#F2F4F7;--ink:#14203A;--muted:#5C6679;--line:#D3DAE4;--card:#FFFFFF;--soft:#EEF1F6;
+  --bell:#F4B400;--urgent:#D2433F;--needs:#2E6BD6;--later:#7C8597;--ok:#1E9A5E;
+  color-scheme:light
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#0F1522;--ink:#E8ECF4;--muted:#9AA5BA;--line:#2A3448;--card:#171F30;--soft:#1F2840;
+  --urgent:#F07470;--needs:#76A3F2;--later:#9AA3B5;--ok:#4CC28A;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.bell{background:var(--bell);color:#14203A;font-weight:800;letter-spacing:.08em;padding:6px 10px;border-radius:8px;font-size:14px}
+.tag{color:var(--muted);font-size:13px}
+.setup{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--card)}
+.chip.on::before{content:"● ";color:var(--ok)}
+.chip.off::before{content:"● ";color:var(--later)}
+.chip.bad::before{content:"● ";color:var(--urgent)}
+button.mini{font-size:12px;padding:3px 10px;border-radius:999px}
+.action label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px}
+input.reply{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+input.reply:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
+.notice.ok{color:var(--ok)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 6px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stat b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--needs);border-radius:14px;padding:14px;margin-bottom:10px}
+.card.urgent{border-left-color:var(--urgent)}
+.card.later{border-left-color:var(--later)}
+.card.done{border-left-color:var(--ok)}
+.meta{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:2px 7px;background:var(--soft)}
+.pill.urgent{background:var(--urgent);color:#fff}
+.pill.needs_you{background:var(--needs);color:#fff}
+.pill.calling{background:var(--bell);color:#14203A}
+.summary{font-weight:650;margin:6px 0 4px;font-size:15.5px}
+.reason{font-size:13.5px;color:var(--muted)}
+.action{margin-top:8px;font-size:14px;background:var(--soft);border-radius:10px;padding:8px 10px;overflow-wrap:anywhere}
+.original{margin-top:8px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+button{font:inherit;font-weight:700;border-radius:10px;padding:9px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.primary{background:var(--needs);border-color:var(--needs);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
+.empty{color:var(--muted);font-size:14px;background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:14px}
+.row{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.row:last-child{border-bottom:0}
+.row .when{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px}
+.row .kind{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);min-width:70px}
+.list{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px 14px}
+.demo{display:flex;gap:8px;flex-wrap:wrap}
+.notice{margin-top:10px;font-size:13px;color:var(--urgent)}
+footer{margin-top:28px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12.5px;gap:10px;flex-wrap:wrap}
+@media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="bell">HUSHBELL</span><span class="tag">Hushed all day. Rings when your kid needs you.</span></div>
+    <div class="setup" id="setup"></div>
+  </header>
+
+  <div class="stats" id="stats">
+    <div class="stat"><b id="sMsgs">0</b><span>school messages today</span></div>
+    <div class="stat"><b id="sUrgent">0</b><span>urgent today</span></div>
+    <div class="stat"><b id="sNeeds">0</b><span>waiting for you</span></div>
+    <div class="stat"><b id="sDone">0</b><span>done for you</span></div>
+  </div>
+
+  <h2>Needs you</h2>
+  <div id="needs"></div>
+
+  <section id="demoBox" hidden>
+    <h2>Demo messages</h2>
+    <div class="demo">
+      <button type="button" data-demo="0">Bake sale</button>
+      <button type="button" data-demo="1">Field trip form</button>
+      <button type="button" data-demo="2">WhatsApp repost</button>
+      <button type="button" data-demo="3">Fever</button>
+    </div>
+  </section>
+
+  <h2>Handled and in progress</h2>
+  <div id="handled"></div>
+
+  <h2 id="laterTitle">For tonight's digest</h2>
+  <div id="later"></div>
+
+  <h2>Activity</h2>
+  <div class="list" id="events"></div>
+
+  <footer>
+    <span>Runs on your own laptop and phone. Nothing is sent, signed or paid without your OK.</span>
+    <form method="post" action="/logout"><button type="submit">Sign out</button></form>
+  </footer>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const time = t => new Date(t * 1000).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  const busy = new Set();
+  const drafts = {};
+  let notice = "";
+  let noticeOk = false;
+
+  function actionText(it) {
+    if (it.action_type === "reply" && it.reply_text) return `Will reply in ${esc(it.app)}: “${esc(it.reply_text)}”`;
+    if (it.action_type === "open_link" && it.url) return `Will fill in the form: ${esc(it.url)}${it.instructions ? " · " + esc(it.instructions) : ""}`;
+    return "Nothing to send. Approving marks it as seen.";
+  }
+  function replyBox(it) {
+    const value = drafts[it.id] ?? it.reply_text;
+    return `<div class="action"><label for="r-${esc(it.id)}">Reply that will be sent in ${esc(it.app)}. You can change it.</label>
+      <input class="reply" id="r-${esc(it.id)}" data-reply-for="${esc(it.id)}" maxlength="300" value="${esc(value)}"></div>`;
+  }
+  function approveLabel(it) {
+    if (it.action_type === "reply") return "Send reply";
+    if (it.action_type === "open_link") return "Fill the form";
+    return "Mark seen";
+  }
+  function meta(it) {
+    const from = it.sources && it.sources.length > 1 ? `${esc(it.sender)} · ${it.sources.map(esc).join(" + ")}` : `${esc(it.sender)} · ${esc(it.app)}`;
+    return `${from} · ${time(it.created_at)}${it.due ? " · due " + esc(it.due) : ""}`;
+  }
+
+  function needsCard(it) {
+    const calling = it.status === "calling";
+    const cls = it.category === "urgent" ? "urgent" : "";
+    return `<article class="card ${cls}">
+      <div class="meta"><span class="pill ${esc(it.category)}">${it.category === "urgent" ? "URGENT" : "NEEDS YOU"}</span>
+        ${calling ? '<span class="pill calling">Calling you now</span>' : ""}<span>${meta(it)}</span></div>
+      <div class="summary">${esc(it.summary || it.text)}</div>
+      <div class="reason">${it.rule_hit ? "Safety words: " + esc(it.rule_hit) : esc(it.reason)}</div>
+      ${it.action_type === "reply" && it.reply_text ? replyBox(it) : `<div class="action">${actionText(it)}</div>`}
+      ${(it.summary || "").includes(it.text) ? "" : `<div class="original">Message: ${esc(it.text)}</div>`}
+      <div class="btns">
+        <button type="button" class="primary" data-approve="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>${approveLabel(it)}</button>
+        <button type="button" data-skip="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>I'll handle it</button>
+      </div>
+    </article>`;
+  }
+
+  const STATUS_TEXT = {sorting: "Sorting…", approved: "Approved, starting…", acting: "Working on your phone…",
+    done: "Done", failed: "Didn't finish", skipped: "You're handling it", new: "Received"};
+
+  function handledRow(it) {
+    const cls = it.status === "done" ? "done" : it.category === "urgent" ? "urgent" : it.category === "later" ? "later" : "";
+    return `<article class="card ${cls}">
+      <div class="meta"><span class="pill">${esc(STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
+      <div class="summary">${esc(it.summary || it.text)}</div>
+      ${it.result ? `<div class="reason">${esc(it.result)}</div>` : ""}
+      ${it.status === "failed" ? `<div class="btns"><button type="button" data-retry="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>Try again</button></div>` : ""}
+    </article>`;
+  }
+
+  function render(s) {
+    const setup = s.setup;
+    const phone = !setup.reading_phone ? ["off", "Phone reading off"]
+      : setup.phone_health === "ok" ? ["on", "Phone connected"]
+      : setup.phone_health === "starting" ? ["off", "Connecting to phone…"]
+      : ["bad", "Phone not connected"];
+    $("setup").innerHTML = [
+      `<span class="chip ${setup.calls ? "on" : "off"}">Calls ${setup.calls ? "on" : "off"}</span>`,
+      `<span class="chip ${phone[0]}">${phone[1]}</span>`,
+      `<span class="chip ${setup.phone_actions === "mobilerun" ? "on" : "off"}">Actions: ${esc(setup.phone_actions)}</span>`,
+      setup.calls ? '<button type="button" class="mini" data-testcall="1">Test call</button>' : "",
+    ].join("");
+    $("sMsgs").textContent = s.counts.messages_today;
+    $("sUrgent").textContent = s.counts.urgent_today;
+    $("sNeeds").textContent = s.counts.needs_you;
+    $("sDone").textContent = s.counts.done_today;
+    $("demoBox").hidden = !setup.demo;
+    $("laterTitle").textContent = `For tonight's digest (${setup.digest_time})`;
+
+    const open = s.items.filter(i => i.status === "calling" || i.status === "waiting")
+      .sort((a, b) => (a.category === "urgent" ? 0 : 1) - (b.category === "urgent" ? 0 : 1) || b.created_at - a.created_at);
+    const typing = document.activeElement && document.activeElement.classList.contains("reply");
+    if (!typing) {
+      $("needs").innerHTML = (notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "") +
+        (open.length ? open.map(needsCard).join("") : '<div class="empty">Nothing needs you right now. Your phone can stay quiet.</div>');
+    }
+
+    const handled = s.items.filter(i => ["sorting","approved","acting","done","failed","skipped","new"].includes(i.status)).slice(0, 20);
+    $("handled").innerHTML = handled.length ? handled.map(handledRow).join("") : '<div class="empty">Nothing yet today.</div>';
+
+    const later = s.items.filter(i => i.status === "later").slice(0, 40);
+    $("later").innerHTML = later.length
+      ? `<div class="list">${later.map(i => `<div class="row"><span class="when">${time(i.created_at)}</span><span>${esc(i.sender)} · ${esc(i.summary || i.text)}</span></div>`).join("")}</div>`
+      : '<div class="empty">Nothing saved for later yet.</div>';
+
+    $("events").innerHTML = s.events.length
+      ? s.events.map(e => `<div class="row"><span class="when">${time(e.at)}</span><span class="kind">${esc(e.kind)}</span><span>${esc(e.detail)}</span></div>`).join("")
+      : '<div class="row">No activity yet.</div>';
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch("/api/state", {credentials: "same-origin"});
+      if (r.status === 401) { location.reload(); return; }
+      render(await r.json());
+    } catch (e) { /* offline for a moment; try again on the next tick */ }
+  }
+
+  async function post(url, id, body, okText) {
+    if (id) busy.add(id);
+    notice = ""; noticeOk = false;
+    try {
+      const options = {method: "POST", credentials: "same-origin"};
+      if (body) { options.headers = {"Content-Type": "application/json"}; options.body = JSON.stringify(body); }
+      const r = await fetch(url, options);
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        notice = data.detail || "That didn't work. Try again.";
+      } else if (okText) { notice = okText; noticeOk = true; }
+    } catch (e) { notice = "Couldn't reach Hushbell. Check that it is still running."; }
+    if (id) busy.delete(id);
+    refresh();
+  }
+
+  document.addEventListener("click", e => {
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.dataset.approve) {
+      const box = document.querySelector(`[data-reply-for="${CSS.escape(t.dataset.approve)}"]`);
+      post(`/api/items/${encodeURIComponent(t.dataset.approve)}/approve`, t.dataset.approve, box ? {reply_text: box.value} : null);
+      delete drafts[t.dataset.approve];
+    }
+    else if (t.dataset.retry) post(`/api/items/${encodeURIComponent(t.dataset.retry)}/retry`, t.dataset.retry);
+    else if (t.dataset.testcall) post("/api/test-call", null, null, "Calling your phone now. It should ring even on Do Not Disturb.");
+    else if (t.dataset.skip) post(`/api/items/${encodeURIComponent(t.dataset.skip)}/skip`, t.dataset.skip);
+    else if (t.dataset.demo) post(`/api/demo/${t.dataset.demo}`);
+  });
+
+  document.addEventListener("input", e => {
+    if (e.target.classList && e.target.classList.contains("reply")) drafts[e.target.dataset.replyFor] = e.target.value;
+  });
+
+  refresh();
+  setInterval(refresh, 2000);
+})();
+</script>
+</body>
+</html>

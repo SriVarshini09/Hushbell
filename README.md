@@ -1,0 +1,196 @@
+# Hushbell
+
+**Hushed all day. Rings when your kid needs you.**
+
+Parents get dozens of school messages a day, spread across Remind, ClassDojo, WhatsApp parent
+groups and email. Most of it can wait. Hidden in the pile is sometimes the one that can't:
+*"Maya has a fever, please pick her up by 1 pm."* With Do Not Disturb on, that one gets missed too.
+
+Hushbell is an open-source agent that watches the school apps on your own phone while it's on
+Do Not Disturb:
+
+- **Noise waits.** Bake sales, newsletters and photos go into one evening digest.
+- **Things that need a yes become one card.** "Field trip form due today" → tap once and
+  Hushbell fills in the form on your phone. You can edit a reply before it's sent.
+- **Emergencies ring through.** Hushbell is the only caller your phone lets through Do Not
+  Disturb. It tells you what happened, you press **1**, and it replies to the teacher inside the app.
+
+You never open a school app, and nothing is sent, signed or paid without your OK.
+
+## How it works
+
+A 2-minute animated walkthrough is in [`docs/explainer.html`](docs/explainer.html) (download it and open it in a browser).
+
+```
+ school apps on your phone            Hushbell on your laptop                       you
+ ─────────────────────────            ───────────────────────                       ───
+ Remind, ClassDojo,        USB   ① Read new notifications (adb)
+ WhatsApp group, Gmail  ───────► ② Tidy: which child, merge the same news from two apps
+                                 ③ Safety rules first: fever, hurt, pick up, lockdown…
+                                 ④ Claude sorts the rest: urgent · needs you · later
+                                        │
+                     ┌──────────────────┼───────────────────────┐
+                  URGENT            NEEDS YOU                  LATER
+             Twilio calls you    a card on the Hushbell     the 6 pm digest
+             through DND ───────►page (any phone browser)
+                     └─────► ⑤ wait for your OK (LangGraph interrupt) ◄──┘
+                                        │ press 1 / tap Approve
+                             ⑥ act in the app on your phone (Mobilerun)
+```
+
+- **Reading** uses `adb shell dumpsys notification`, so nothing is installed on the phone for it,
+  and it works with apps that have no API or integration.
+- **Safety rules** are plain patterns that run before any AI, so a model mistake can't hide a sick
+  child. They skip look-alikes such as "emergency contact form" and "lockdown drill".
+- **Sorting** uses Claude (`claude-opus-5-5` by default, low effort, structured output). If Claude
+  is unreachable, messages are shown to you instead of being dropped, and the safety rules still work.
+- **Waiting for your OK** is a LangGraph `interrupt()`. The phone action runs in a separate step,
+  so a resumed run never repeats a side effect.
+- **Acting** uses [Mobilerun](https://github.com/droidrun/mobilerun) to tap and type on the phone.
+
+## Try it in two minutes (no phone needed)
+
+```bash
+git clone https://github.com/SriVarshini09/Hushbell.git
+cd Hushbell
+python -m venv .venv
+.venv/Scripts/activate        # Windows; on macOS/Linux: source .venv/bin/activate
+pip install -e .
+hushbell init                 # answers a few questions and writes .env (or copy .env.example)
+hushbell run --no-phone --dry-run --demo
+```
+
+Open http://localhost:8000, sign in with the token it prints, and press the demo buttons:
+bake sale → later, field trip form → needs you (the WhatsApp repost joins it), fever → urgent.
+With `--dry-run`, Hushbell only logs what it would do on the phone.
+
+## Full setup
+
+You need Python 3.11–3.13, an Android phone with a SIM, a USB cable, and a laptop.
+
+### 1. The phone: let Hushbell read notifications
+
+1. On the phone: **Settings → About phone → tap Build number 7 times**, then
+   **Developer options → USB debugging: on**. (Samsung: turn off *Auto Blocker*. Xiaomi: also
+   turn on *USB debugging (Security settings)*.)
+2. Install [Android platform-tools](https://developer.android.com/tools/releases/platform-tools)
+   so `adb` works, plug the phone in, and accept the prompt on the phone.
+3. Install your school apps and sign in as the parent.
+4. Run `hushbell notifications`. It lists every notification on the phone and marks the ones
+   Hushbell would read. Add other school apps with `HUSHBELL_APPS` and set `HUSHBELL_KEYWORDS`
+   for WhatsApp and Gmail (Hushbell ignores personal chats and email that don't mention them).
+
+### 2. Acting on the phone (after your OK)
+
+```bash
+uv tool install "mobilerun[anthropic]"   # or: pip install it into ~/.hushbell/mobilerun-venv, which Hushbell finds by itself
+mobilerun setup        # installs the Portal app and turns on its accessibility service
+mobilerun configure    # choose Anthropic and add your key
+mobilerun ping         # "Portal is installed and accessible"
+```
+
+Use Python 3.11–3.13 for Mobilerun. Keep the phone unlocked and awake while it's plugged in
+(Developer options → *Stay awake*), because the agent needs the screen.
+
+### 3. Calls through Do Not Disturb
+
+1. Get a [Twilio](https://www.twilio.com) number with voice. Trial accounts can only call
+   verified numbers and play a trial notice first; upgrading removes both.
+2. Give Twilio a way to reach your laptop: run `ngrok http 8000` in another terminal. Hushbell
+   finds the ngrok address by itself (or set `HUSHBELL_PUBLIC_URL`).
+3. Fill in `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` and
+   `HUSHBELL_PARENT_PHONE` in `.env`.
+4. **On the parent's phone, save the Twilio number as a contact named "Hushbell" and star it.**
+   - Android: Settings → *Do Not Disturb* (or *Modes*) → People → Calls → **Starred contacts**.
+   - iPhone: Settings → Focus → (your Focus) → People → add Hushbell, or turn on
+     **Emergency Bypass** in the contact.
+
+   If you miss the first call, Hushbell calls once more a minute later. Most phones also let a
+   second call from the same number within a few minutes ring through.
+5. Check it: turn on Do Not Disturb and press **Test call** on the page (or run
+   `hushbell call-test`). Your phone should ring.
+
+### 4. Run it
+
+```bash
+hushbell doctor        # checks every piece and says what to fix (add --live to test Claude and Twilio)
+hushbell run
+```
+
+Open the page on the laptop, or on your phone at `http://<laptop IP>:8000` (same Wi-Fi) or at
+your ngrok address. Everything works from a phone: the calls, the approval cards, and the log.
+
+Other commands: `hushbell notifications` (what the phone shows and what Hushbell would read;
+`--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`.
+
+**If Hushbell stops and starts again**, nothing is lost: messages that arrived while it was off
+are picked up from the phone, cards waiting for your OK are still waiting, and anything that was
+halfway through on the phone is marked "didn't finish" with a **Try again** button.
+
+## Configuration
+
+All settings are environment variables; `.env.example` lists them. The main ones:
+
+| Variable | What it does |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude credentials for sorting |
+| `HUSHBELL_CHILDREN`, `HUSHBELL_PARENT_NAME`, `HUSHBELL_SCHOOLS` | Family details used when sorting and filling forms |
+| `HUSHBELL_KEYWORDS` | Words that mark a WhatsApp or Gmail notification as school-related |
+| `HUSHBELL_APPS` | Extra school apps: `package=Label:school` or `:mixed` |
+| `HUSHBELL_EXTRA_URGENT_WORDS` | More words that should always ring you (e.g. `head lice`) |
+| `HUSHBELL_PHONE_BACKEND` | `mobilerun` (default) or `dry-run` |
+| `TWILIO_*`, `HUSHBELL_PARENT_PHONE`, `HUSHBELL_PUBLIC_URL` | Calls through Do Not Disturb |
+| `HUSHBELL_DIGEST_TIME` | When the evening digest is written (default `18:00`) |
+| `HUSHBELL_ACCESS_TOKEN` | Token for the page; created for you if empty (`hushbell token`) |
+| `HUSHBELL_DATA_DIR` | Where the database lives (default `~/.hushbell`) |
+
+Forwarding apps (Tasker, MacroDroid) or scripts can also post messages to
+`POST /api/ingest` with `Authorization: Bearer <token>` and `{"app", "sender", "text"}`.
+
+## Privacy and safety
+
+- **Runs on your own phone and laptop.** There is no Hushbell server. Messages are stored in a
+  SQLite file in `~/.hushbell`.
+- **What leaves your laptop:** the text of each school message goes to the Claude API to be
+  sorted, and urgent summaries are read to you by Twilio on the call.
+- **Personal messages are never read.** For apps like WhatsApp and Gmail, only notifications that
+  mention your keywords are processed.
+- **Nothing happens without your OK.** Replies and forms run only after you press 1 or tap
+  Approve. The agent is told never to enter passwords or payment details and to stop if asked.
+- **Only web links are opened**, and only after you approve them.
+- **The page is locked** with an access token (sign-in locks for 10 minutes after 8 wrong tries);
+  Twilio webhooks are checked with Twilio's signature.
+- **Message text is treated as untrusted.** Claude is told not to follow instructions inside it.
+- Use Hushbell on your own accounts. Some apps forbid automation; WhatsApp in particular, so keep
+  it to reading and occasional approved replies.
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+```
+hushbell/
+  cli.py            hushbell init · run · doctor · notifications · call-test · send · token
+  setup_wizard.py   the questions behind `hushbell init`
+  tunnel.py         finds a running ngrok address
+  config.py         settings from the environment
+  engine.py         the LangGraph flow: triage → call or card → wait for OK → act
+  ingest/adb.py     reads and parses phone notifications
+  triage/           safety rules, duplicate merging, Claude sorting
+  voice.py          Twilio calls and the call script
+  phone.py          Mobilerun actions (and a dry-run backend)
+  store.py          SQLite storage and the activity log
+  web/              the page and the Twilio webhooks
+tests/
+```
+
+The 2-minute demo script and judge Q&A are in [`docs/demo-script.md`](docs/demo-script.md).
+
+Built at the Do Not Disturb Hackathon (Entrepreneurs First, San Francisco, November 2026).
+
+## License
+
+MIT

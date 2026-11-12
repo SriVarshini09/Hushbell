@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+
+# Secrets and local data
+.env
+*.db
+access_token
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Hackathon planning files kept next to the repo, not in it
+research_notes/
+reports/
+*.mp4
+Hushbell build plan.md
+how-hushbell-works.html

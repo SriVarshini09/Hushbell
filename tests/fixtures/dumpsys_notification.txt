@@ -1,0 +1,60 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0f3a1b2c: pkg=com.remind101 user=UserHandle{0} id=1042 tag=null importance=4 key=0|com.remind101|1042|null|10213: Notification(channel=announcements shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x10 color=0xff5b57d1 vis=PRIVATE))
+      uid=10213 userId=0
+      opPkg=com.remind101
+      icon=Icon(typ=RESOURCE pkg=com.remind101 id=0x7f080123)
+      flags=0x10
+      pri=0
+      key=0|com.remind101|1042|null|10213
+      seen=false
+      groupKey=0|com.remind101|g:announcements
+      notification=
+        pri=0
+        contentIntent=PendingIntent{4b1e2c0: PendingIntentRecord{e1a3b01 com.remind101 startActivity}}
+        extras={
+          android.title=String (Ms. Rivera · Room 12)
+          android.reduced.images=Boolean (true)
+          android.subText=null
+          android.showChronometer=Boolean (false)
+          android.text=String (Maya has a fever (101°F). Please pick her up by 1pm.)
+          android.progress=Integer (0)
+          android.bigText=String (Maya has a fever (101°F). Please pick her up by 1pm.)
+        }
+      stats=SingleNotificationStats{posttimeElapsedMs=12345}
+    NotificationRecord(0x0a11cafe: pkg=com.whatsapp user=UserHandle{0} id=1 tag=null importance=4 key=0|com.whatsapp|1|null|10190: Notification(channel=group_chat_defaults_5 shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x18 color=0xff075e54 vis=PRIVATE))
+      uid=10190 userId=0
+      notification=
+        extras={
+          android.title=String (3rd grade parents)
+          android.text=String (Jen: Reminder: field trip form due today!)
+          android.conversationTitle=String (3rd grade parents)
+        }
+    NotificationRecord(0x0b22beef: pkg=com.whatsapp user=UserHandle{0} id=2 tag=null importance=4 key=0|com.whatsapp|2|null|10190: Notification(channel=individual_chat_defaults_3 flags=0x18 vis=PRIVATE))
+      notification=
+        extras={
+          android.title=String (Alex)
+          android.text=String (call me when you can)
+        }
+    NotificationRecord(0x0c33f00d: pkg=com.google.android.gm user=UserHandle{0} id=0 tag=gig:12345:parent.demo@gmail.com key=0|com.google.android.gm|0|gig:12345:parent.demo@gmail.com|10150: Notification(channel=^sync flags=0x18 vis=PRIVATE))
+      notification=
+        extras={
+          android.title=String (Lincoln Elementary)
+          android.text=SpannableString (Weekly newsletter: Nov 12)
+          android.subText=String (parent.demo@gmail.com)
+          android.bigText=SpannableString (Weekly newsletter: Nov 12
+Picture day is Thursday. Book fair all week.)
+        }
+    NotificationRecord(0x0d44aaaa: pkg=com.google.android.gm user=UserHandle{0} id=1 tag=summary key=0|com.google.android.gm|1|summary|10150: Notification(channel=^sync flags=0x218 vis=PRIVATE))
+      notification=
+        extras={
+          android.title=String (Lincoln Elementary)
+          android.text=String (3 new messages)
+        }
+    NotificationRecord(0x0e55bbbb: pkg=com.android.systemui user=UserHandle{0} id=7 tag=null key=0|com.android.systemui|7|null|10099: Notification(channel=DEVELOPER flags=0x2 vis=PUBLIC))
+      notification=
+        extras={
+          android.title=String (USB debugging connected)
+          android.text=String (Tap to turn off USB debugging)
+        }
+  Snoozed notifications:
