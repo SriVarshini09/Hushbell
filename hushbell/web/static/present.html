@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Hushbell · Live</title>
+<style>
+:root{
+  /* Projector view: one row per school message, read left to right: arrived, decided, done. */
+  --paper:#0F1522;--ink:#EEF2F8;--muted:#A3AEC2;--line:#26304A;--card:#161F33;--soft:#1E2942;
+  --bell:#F4B400;--urgent:#F26D69;--needs:#6FA0F5;--later:#9AA3B5;--ok:#4CC28A;
+  color-scheme:dark
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font:18px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1500px;margin:0 auto;padding:22px 28px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.bell{background:var(--bell);color:#14203A;font-weight:800;letter-spacing:.08em;padding:8px 14px;border-radius:10px;font-size:20px}
+.tag{color:var(--muted);font-size:18px}
+.live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:16px;font-variant-numeric:tabular-nums}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.dot{animation:pulse 1.6s ease-in-out infinite}}
+@keyframes pulse{50%{opacity:.35}}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:20px 0 22px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 18px}
+.stat b{display:block;font-size:40px;line-height:1.05;font-variant-numeric:tabular-nums}
+.stat span{font-size:15px;color:var(--muted)}
+.cols,.row{display:grid;grid-template-columns:1.05fr .9fr 1.25fr;gap:14px}
+.cols{padding:0 4px 8px;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.row{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--needs);border-radius:16px;padding:16px 18px;margin-bottom:12px}
+.row.urgent{border-left-color:var(--urgent)} .row.later{border-left-color:var(--later)}
+@media (prefers-reduced-motion:no-preference){.row.fresh{animation:in .5s ease-out}}
+@keyframes in{from{transform:translateY(-10px);opacity:0}}
+.app{display:inline-block;font-size:13px;font-weight:700;border-radius:6px;padding:2px 8px;background:var(--soft);color:var(--ink);margin-right:6px}
+.from{color:var(--muted);font-size:15px}
+.text{margin-top:6px;font-size:18px;overflow-wrap:anywhere}
+.pill{display:inline-block;font-size:14px;font-weight:800;letter-spacing:.05em;border-radius:7px;padding:3px 10px}
+.pill.urgent{background:var(--urgent);color:#fff} .pill.needs_you{background:var(--needs);color:#0F1522}
+.pill.later{background:var(--soft);color:var(--ink)} .pill.wait{background:var(--soft);color:var(--muted)}
+.why{margin-top:8px;color:var(--muted);font-size:16px}
+.rules{color:var(--bell);font-weight:700}
+.step{display:flex;gap:10px;align-items:flex-start;padding:3px 0;font-size:17px;overflow-wrap:anywhere}
+.mark{flex:none;width:22px;text-align:center;font-weight:800}
+.mark.done{color:var(--ok)} .mark.failed{color:var(--urgent)} .mark.skipped{color:var(--later)} .mark.pending{color:var(--muted)}
+.state{display:inline-block;margin-bottom:6px;font-size:14px;font-weight:800;border-radius:7px;padding:3px 10px;background:var(--soft)}
+.state.calling{background:var(--bell);color:#14203A}
+.state.done{color:var(--ok)} .state.failed{color:var(--urgent)}
+.empty{color:var(--muted);font-size:20px;background:var(--card);border:1px dashed var(--line);border-radius:16px;padding:28px;text-align:center}
+.ticker{margin-top:18px;color:var(--muted);font-size:15px}
+.ticker div{padding:3px 0}
+.ticker b{color:var(--ink);font-weight:700;margin-right:8px}
+a{color:var(--muted)}
+@media (max-width:900px){.cols{display:none}.row{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="bell">HUSHBELL</span><span class="tag">Hushed all day. Rings when your kid needs you.</span></div>
+    <div class="live"><span class="dot" aria-hidden="true"></span><span id="clock">Live</span> · <a href="/">parent's page</a></div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b id="sMsgs">0</b><span>school messages</span></div>
+    <div class="stat"><b id="sUrgent">0</b><span>urgent</span></div>
+    <div class="stat"><b id="sCalls">0</b><span>calls to the parent</span></div>
+    <div class="stat"><b id="sTaps">0</b><span>taps and keypresses</span></div>
+    <div class="stat"><b id="sDone">0</b><span>handled for the parent</span></div>
+  </div>
+
+  <div class="cols"><span>1 · What arrived on the phone</span><span>2 · What Hushbell decided</span><span>3 · What Hushbell did</span></div>
+  <div id="rows"></div>
+  <div class="ticker" id="ticker"></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const time = t => new Date(t * 1000).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  const seen = new Set();
+  const MARK = {done: "✓", failed: "✗", skipped: "–", pending: "·"};
+  const LABEL = {urgent: "URGENT", needs_you: "NEEDS YOU", later: "LATER"};
+
+  function decided(it) {
+    if (!it.category) return '<span class="pill wait">Sorting…</span>';
+    const why = it.rule_hit ? `<span class="rules">Safety words: ${esc(it.rule_hit)}</span> · no AI needed` : esc(it.reason);
+    const src = it.sources && it.sources.length > 1 ? `<div class="why">Same news in ${it.sources.map(esc).join(" + ")}: merged</div>` : "";
+    return `<span class="pill ${esc(it.category)}">${LABEL[it.category] || esc(it.category)}</span><div class="why">${why}</div>${src}`;
+  }
+
+  function did(it) {
+    let state = "";
+    if (it.status === "calling") state = '<span class="state calling">Calling the parent through Do Not Disturb</span>';
+    else if (it.status === "waiting") state = '<span class="state">Waiting for the parent\'s OK</span>';
+    else if (it.status === "acting" || it.status === "approved") state = '<span class="state">Working on the phone…</span>';
+    else if (it.status === "done") state = '<span class="state done">Done</span>';
+    else if (it.status === "failed") state = '<span class="state failed">Didn\'t finish</span>';
+    else if (it.status === "skipped") state = '<span class="state">Parent is handling it</span>';
+    else if (it.status === "later") state = '<span class="state">Saved for tonight\'s digest</span>';
+    const steps = (it.steps || []).map(st => {
+      const status = st.status || "pending";
+      return `<div class="step"><span class="mark ${esc(status)}">${MARK[status] || "·"}</span><span>${esc(st.label)}</span></div>`;
+    }).join("");
+    return state + steps;
+  }
+
+  function render(s) {
+    $("sMsgs").textContent = s.counts.messages_today;
+    $("sUrgent").textContent = s.counts.urgent_today;
+    $("sCalls").textContent = s.counts.calls_today;
+    $("sTaps").textContent = s.counts.taps_today + s.counts.keypresses_today;
+    $("sDone").textContent = s.counts.done_today;
+    const items = s.items.slice(0, 8);
+    $("rows").innerHTML = items.length ? items.map(it => {
+      const fresh = !seen.has(it.id);
+      seen.add(it.id);
+      const cls = it.category === "urgent" ? "urgent" : it.category === "later" ? "later" : "";
+      return `<div class="row ${cls} ${fresh ? "fresh" : ""}">
+        <div><span class="app">${esc(it.app)}</span><span class="from">${esc(it.sender)} · ${time(it.created_at)}</span>
+          <div class="text">${esc(it.text)}</div></div>
+        <div>${decided(it)}</div>
+        <div>${did(it)}</div>
+      </div>`;
+    }).join("") : '<div class="empty">Waiting for school messages. The parent\'s phone is on Do Not Disturb.</div>';
+    $("ticker").innerHTML = s.events.slice(0, 4).map(e => `<div><b>${time(e.at)}</b>${esc(e.detail)}</div>`).join("");
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch("/api/state", {credentials: "same-origin"});
+      if (r.status === 401) { location.href = "/"; return; }
+      render(await r.json());
+    } catch (e) { /* try again next tick */ }
+    $("clock").textContent = "Live · " + new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+  }
+  refresh();
+  setInterval(refresh, 1000);
+})();
+</script>
+</body>
+</html>

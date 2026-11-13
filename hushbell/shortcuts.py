@@ -73,6 +73,10 @@ class AndroidShortcuts:
         return self._shell("am", "start", "-a", "android.intent.action.SENDTO", "-d", f"smsto:{number}",
                            "--es", "sms_body", text)
 
+    def open_dialer(self, number: str) -> ShortcutResult:
+        """Open the phone app with the number ready to call. The parent still taps Call."""
+        return self._shell("am", "start", "-a", "android.intent.action.DIAL", "-d", f"tel:{number}")
+
     def open_directions(self, destination: str) -> ShortcutResult:
         url = ("https://www.google.com/maps/dir/?api=1&travelmode=driving&destination="
                + quote(destination, safe=""))

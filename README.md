@@ -17,9 +17,13 @@ Do Not Disturb:
   Disturb. It tells you what happened, you press **1**, and it handles the whole situation on
   your phone: replies to the teacher, sets a "time to leave" alarm, texts your co-parent, and
   opens directions to school.
+- **The school can call Hushbell.** It answers, asks who's calling and why, and if it's urgent it
+  rings you through Do Not Disturb. Press 1 and you're connected to the caller, while Hushbell sets
+  your alarm, texts your co-parent and opens directions.
 - **Coming up.** Every date in your school messages (trips, picture day, deadlines) in one list,
   with "Add to calendar".
-- **Ask Hushbell.** "What do I need to do this week?" Claude answers from your school messages.
+- **Ask Hushbell.** "What do I need to do this week?" Type it on the page, or call Hushbell from
+  your own phone and ask out loud.
 
 You never open a school app, and nothing is sent, signed or paid without your OK.
 
@@ -33,6 +37,7 @@ You never open a school app, and nothing is sent, signed or paid without your OK
 | Message | Hushbell's plan, run after your OK |
 |---|---|
 | "Maya has a fever, please pick her up by 1 pm" | Calls you through DND → reply to the teacher, alarm at 12:30 to leave, text your co-parent, directions to school |
+| The school nurse **calls** Hushbell's number | Hushbell answers and takes the message → calls you through DND → press 1 to be connected to the nurse, plus the alarm, text and directions |
 | "Field trip next Friday, permission form due today" + link | Fill in and submit the form, add the trip to your calendar |
 | "Can Leo stay for chess club Wednesday until 4:30?" | Reply to the teacher (you can edit it), add chess club to your calendar |
 | "Picture day is next Thursday" | Saved for tonight's digest, with an "Add to calendar" button |
@@ -136,6 +141,13 @@ Use Python 3.11–3.13 for Mobilerun. Keep the phone unlocked and awake while it
    second call from the same number within a few minutes ring through.
 5. Check it: turn on Do Not Disturb and press **Test call** on the page (or run
    `hushbell call-test`). Your phone should ring.
+6. **Calls to Hushbell.** Each time Hushbell starts, it points your Twilio number's incoming calls
+   at itself (turn this off with `HUSHBELL_TWILIO_AUTOCONFIG=0`). Then:
+   - Anyone who calls the number (give it to the school, or forward your unanswered calls to it;
+     most US carriers support that, with codes that vary) is answered by Hushbell, asked what it's
+     about, and offered "press 1 if this is an emergency".
+   - When **you** call it from your own number, Hushbell asks what you'd like to know and answers
+     out loud from your school messages.
 
 ### 4. Run it
 
@@ -146,6 +158,9 @@ hushbell run
 
 Open the page on the laptop, or on your phone at `http://<laptop IP>:8000` (same Wi-Fi) or at
 your ngrok address. Everything works from a phone: the calls, the approval cards, and the log.
+
+For a demo on a projector, open **http://localhost:8000/present**: one row per message, showing
+what arrived, what Hushbell decided and each step it did, live.
 
 Other commands: `hushbell notifications` (what the phone shows and what Hushbell would read;
 `--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`, and

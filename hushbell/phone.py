@@ -113,6 +113,8 @@ def describe_step(step: dict) -> str:
         return f"text {step.get('name')}: “{step.get('text')}”"
     if kind == "directions":
         return f"open directions to {step.get('destination')}"
+    if kind == "call_back":
+        return f"open the phone app ready to call {step.get('number')}"
     return step.get("label", kind or "step")
 
 
@@ -139,6 +141,9 @@ def check_step(step: dict) -> None:
     elif kind == "directions":
         if not clean(step.get("destination", ""), 200):
             raise UnsafeAction("There is no address to get directions to.")
+    elif kind == "call_back":
+        if not valid_phone(str(step.get("number", ""))):
+            raise UnsafeAction("The caller's number doesn't look right.")
     elif kind not in ("reply", "open_link"):
         raise UnsafeAction("Hushbell doesn't know how to do that step.")
 
@@ -207,6 +212,9 @@ class MobilerunPhone:
         if kind == "directions":
             done = self.shortcuts.open_directions(clean(step["destination"], 200))
             return ActionResult(done.ok, "Directions are open on the phone." if done.ok else done.detail)
+        if kind == "call_back":
+            done = self.shortcuts.open_dialer(step["number"])
+            return ActionResult(done.ok, "Their number is ready to call on your phone." if done.ok else done.detail)
         if kind == "add_calendar":
             begin, end, all_day = calendar_times(step)
             title = clean(step["title"], 80)

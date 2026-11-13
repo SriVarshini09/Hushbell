@@ -122,6 +122,13 @@ class Engine:
             item = self.store.get_item(item_id)
             steps = [dict(s, enabled=False, status="skipped") if s["id"] in skip else s for s in item.steps]
             self.store.update_item(item_id, steps=steps)
+        if approved and via == "call":
+            # On the call, Twilio connects the parent to the caller straight away (see web/app.py).
+            item = self.store.get_item(item_id)
+            if any(s["type"] == "call_back" for s in item.steps):
+                steps = [dict(s, status="done", detail="Connected you to them on the call.")
+                         if s["type"] == "call_back" and s.get("enabled", True) else s for s in item.steps]
+                self.store.update_item(item_id, steps=steps)
         verb = "approved" if approved else "said they will handle it"
         how = "on the call" if via == "call" else "on the Hushbell page"
         self.store.add_event("answer", f"Parent {verb} {how}", item_id)
@@ -249,6 +256,11 @@ class Engine:
                 "needs_you": sum(1 for i in items if i.status in OPEN_STATUSES),
                 "later_today": sum(1 for i in today if i.category == "later"),
                 "done_today": sum(1 for i in today if i.status == STATUS_DONE),
+                "calls_today": sum(1 for i in today if i.call_attempts > 0),
+                "taps_today": sum(1 for e in self.store.list_events(limit=500, since=day_start)
+                                  if e["kind"] == "answer" and "page" in e["detail"]),
+                "keypresses_today": sum(1 for e in self.store.list_events(limit=500, since=day_start)
+                                        if e["kind"] == "answer" and "call" in e["detail"]),
             },
             "setup": {
                 "calls": self.settings.calls_enabled,
@@ -462,8 +474,9 @@ class Engine:
 
     def _node_mark_seen(self, state: FlowState) -> FlowState:
         item = self._item(state)
-        self.store.update_item(item.id, status=STATUS_DONE, result="Marked as seen")
-        self.store.add_event("done", "Marked as seen", item.id)
+        finished = " ".join(s["detail"] for s in item.steps if s.get("status") == "done" and s.get("detail"))
+        self.store.update_item(item.id, status=STATUS_DONE, result=finished or "Marked as seen")
+        self.store.add_event("done", finished or "Marked as seen", item.id)
         return {}
 
     def _node_skip(self, state: FlowState) -> FlowState:
@@ -490,7 +503,8 @@ class Engine:
 def _to_do(steps: list[dict]) -> list[dict]:
     """Steps that the parent left ticked and that haven't run yet."""
     return [s for s in steps if s.get("enabled", True) and s.get("status") != "done"
-            and s["type"] in ("reply", "open_link", "set_alarm", "text_partner", "directions", "add_calendar")]
+            and s["type"] in ("reply", "open_link", "set_alarm", "text_partner", "directions", "add_calendar",
+                              "call_back")]
 
 
 def _short(text: str, n: int = 90) -> str:

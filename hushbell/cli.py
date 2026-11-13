@@ -107,6 +107,11 @@ def cmd_run(settings: Settings, args) -> int:
         settings.port = args.port
 
     _use_ngrok_if_running(settings)
+    inbound_note = ""
+    if settings.calls_enabled and settings.twilio_autoconfig:
+        from hushbell.voice import configure_inbound
+
+        inbound_note = configure_inbound(settings)
     engine = build_engine(settings)
     app = create_app(engine)
     recovered = engine.recover()
@@ -133,7 +138,10 @@ def cmd_run(settings: Settings, args) -> int:
     print(f"  Token:  {settings.access_token}")
     print(f"  Sort:   {'Claude (' + settings.model + ')' if has_key else 'safety rules only: no Claude key yet (run `hushbell init`)'}")
     print(f"  Calls:  {'on' if settings.calls_enabled else 'off (set TWILIO_* and HUSHBELL_PARENT_PHONE)'}")
+    if inbound_note:
+        print(f"          {inbound_note}")
     print(f"  Phone:  reading {'on' if reader else 'off'} | actions: {engine.phone.name}")
+    print(f"  Big screen for a demo: http://localhost:{settings.port}/present")
     print(f"  Data:   {settings.data_dir}")
     print()
     try:

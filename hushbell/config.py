@@ -94,6 +94,7 @@ class Settings:
     parent_phone: str = ""
     public_base_url: str = ""
     twilio_validate: bool = True
+    twilio_autoconfig: bool = True   # point the Twilio number's incoming calls at Hushbell on start-up
     redial_seconds: int = 60
 
     # Web page
@@ -172,6 +173,7 @@ class Settings:
             parent_phone=env("HUSHBELL_PARENT_PHONE") or "",
             public_base_url=(env("HUSHBELL_PUBLIC_URL") or "").rstrip("/"),
             twilio_validate=_bool(env("HUSHBELL_TWILIO_VALIDATE"), True),
+            twilio_autoconfig=_bool(env("HUSHBELL_TWILIO_AUTOCONFIG"), True),
             redial_seconds=int(env("HUSHBELL_REDIAL_SECONDS") or 60),
             host=env("HUSHBELL_HOST") or "0.0.0.0",
             port=int(env("HUSHBELL_PORT") or 8000),

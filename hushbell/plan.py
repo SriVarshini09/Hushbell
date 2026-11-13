@@ -20,6 +20,7 @@ from hushbell.config import Settings
 from hushbell.models import Decision, Item
 
 PICKUP_LABELS = {"fever", "vomiting", "sick", "injury", "pickup now", "early dismissal"}
+CALL_APP = "Phone call"  # messages that reached Hushbell as a spoken phone call
 _TIME = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
 _PHONE = re.compile(r"^\+?[0-9]{7,15}$")
 
@@ -54,6 +55,22 @@ def valid_phone(number: str) -> bool:
     return bool(_PHONE.match(number.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")))
 
 
+def pretty_phone(number: str) -> str:
+    digits = "".join(c for c in number if c.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    return number
+
+
+def same_phone(a: str, b: str) -> bool:
+    """True when two phone numbers are the same, ignoring formatting and a leading US country code."""
+    da = "".join(c for c in a if c.isdigit())
+    db = "".join(c for c in b if c.isdigit())
+    return len(da) >= 7 and da[-10:] == db[-10:]
+
+
 def short_sender(sender: str) -> str:
     return re.split(r"\s+[·\-|]\s+", sender.strip())[0] or sender.strip()
 
@@ -68,7 +85,12 @@ def build_steps(item: Item, decision: Decision, settings: Settings, rule_labels:
     steps: list[dict] = []
 
     # 1. What Claude suggested: a reply in the school app, or a form to fill in.
-    if decision.action_type == "reply" and decision.reply_text.strip():
+    #    A message that came in as a phone call is answered by calling back instead.
+    if item.app == CALL_APP:
+        if valid_phone(item.sender):
+            steps.append({"id": "main", "type": "call_back", "number": item.sender,
+                          "label": f"Call {pretty_phone(item.sender)} back", "say": "connect you to them"})
+    elif decision.action_type == "reply" and decision.reply_text.strip():
         name = short_sender(item.sender)
         steps.append({"id": "main", "type": "reply", "label": f"Reply to {name} in {item.app}",
                       "say": f"reply to {name}"})

@@ -13,10 +13,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, Field
 
+from fastapi.concurrency import run_in_threadpool
+
 from hushbell import __version__
 from hushbell.engine import Engine
 from hushbell.models import IncomingMessage
-from hushbell.voice import gather_twiml, needs_page, ring_test_twiml, voice_twiml
+from hushbell.plan import CALL_APP, pretty_phone, same_phone, valid_phone
+from hushbell.voice import (
+    gather_twiml, inbound_check_emergency_twiml, inbound_done_twiml, inbound_greeting_twiml, needs_page,
+    parent_ask_twiml, ring_test_twiml, voice_twiml,
+)
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
@@ -116,6 +122,12 @@ def create_app(engine: Engine) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request):
         page = "index.html" if authed(request) else "login.html"
+        return HTMLResponse((STATIC / page).read_text(encoding="utf-8"))
+
+    @app.get("/present", response_class=HTMLResponse)
+    def present(request: Request):
+        """Big-screen view for a projector: each message, what Hushbell decided, and what it did."""
+        page = "present.html" if authed(request) else "login.html"
         return HTMLResponse((STATIC / page).read_text(encoding="utf-8"))
 
     failures: dict[str, list[float]] = {}
@@ -259,7 +271,78 @@ def create_app(engine: Engine) -> FastAPI:
                                    item_id)
         elif item and digit in ("1", "2"):
             accepted = engine.resume(item_id, digit == "1", "call")
-        return Response(gather_twiml(digit, item, settings.public_base_url, accepted), media_type="application/xml")
+        return Response(gather_twiml(digit, item, settings.public_base_url, accepted,
+                                     caller_id=settings.twilio_from_number),
+                        media_type="application/xml")
+
+    # ---- someone calls Hushbell's number -----------------------------------
+    # The school (or a judge playing the school nurse) calls and speaks. Hushbell writes down
+    # what they said, sorts it like any school message, and rings the parent if it is urgent.
+    # The parent calling from their own number gets "Ask Hushbell" by voice instead.
+
+    pending_calls: dict[str, tuple[str, str, float]] = {}   # CallSid -> (caller, what they said, when)
+
+    def is_parent(number: str) -> bool:
+        return bool(settings.parent_phone) and same_phone(number, settings.parent_phone)
+
+    def xml(body: str) -> Response:
+        return Response(body, media_type="application/xml")
+
+    @app.post("/twilio/inbound")
+    async def twilio_inbound(request: Request, attempt: int = 1):
+        form = await twilio_ok(request)
+        caller = str(form.get("From", ""))
+        if is_parent(caller):
+            engine.store.add_event("ask", "You called Hushbell to ask a question")
+            return xml(parent_ask_twiml(settings))
+        if attempt == 1:
+            engine.store.add_event("incoming call", f"Hushbell answered a call from {pretty_phone(caller) or 'a hidden number'}")
+        return xml(inbound_greeting_twiml(settings, attempt))
+
+    @app.post("/twilio/inbound/heard")
+    async def twilio_inbound_heard(request: Request):
+        form = await twilio_ok(request)
+        caller = str(form.get("From", ""))
+        said = " ".join(str(form.get("SpeechResult", "")).split())[:1000]
+        if not said:
+            return xml(inbound_greeting_twiml(settings, attempt=2))
+        if engine.rules.check(said):
+            take_call_message(caller, said)
+            return xml(inbound_done_twiml(settings, urgent=True))
+        now = time.time()
+        for sid in [s for s, v in pending_calls.items() if now - v[2] > 600]:
+            pending_calls.pop(sid, None)
+        pending_calls[str(form.get("CallSid", ""))] = (caller, said, now)
+        return xml(inbound_check_emergency_twiml(settings))
+
+    @app.post("/twilio/inbound/emergency")
+    async def twilio_inbound_emergency(request: Request):
+        form = await twilio_ok(request)
+        pending = pending_calls.pop(str(form.get("CallSid", "")), None)
+        if pending is None:
+            return xml(inbound_done_twiml(settings, urgent=False))
+        caller, said, _ = pending
+        urgent = str(form.get("Digits", "")).strip() == "1"
+        if urgent:
+            said += " (The caller pressed 1 to say this is an emergency.)"
+        take_call_message(caller, said)
+        return xml(inbound_done_twiml(settings, urgent=urgent))
+
+    def take_call_message(caller: str, said: str) -> None:
+        sender = caller if valid_phone(caller) else "Hidden number"
+        engine.ingest(IncomingMessage(app=CALL_APP, sender=sender, text=said, source="call"))
+
+    @app.post("/twilio/ask")
+    async def twilio_ask(request: Request):
+        form = await twilio_ok(request)
+        if not is_parent(str(form.get("From", ""))):
+            return xml(inbound_done_twiml(settings, urgent=False))
+        question = " ".join(str(form.get("SpeechResult", "")).split())[:300]
+        if not question:
+            return xml(parent_ask_twiml(settings, answer="Sorry, I didn't catch that."))
+        answer = await run_in_threadpool(engine.ask, question)
+        engine.store.add_event("ask", f"You asked by phone: {question}")
+        return xml(parent_ask_twiml(settings, answer=answer))
 
     @app.post("/twilio/test")
     async def twilio_test(request: Request):
