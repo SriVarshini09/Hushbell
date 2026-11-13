@@ -126,6 +126,23 @@ class FakeMessenger:
     def call_later(self, at, words):
         self.reminders.append((at, words))
 
+    def call_with_message(self, to, words):
+        self.calls = getattr(self, "calls", []) + [(to, words)]
+
+
+def test_a_blocked_text_becomes_a_call_to_the_co_parent(settings):
+    class Blocked(FakeMessenger):
+        def send_text(self, to, body):
+            raise RuntimeError("Message blocked: unregistered 10DLC number")
+
+    messenger = Blocked()
+    phone = PhoneUsePhone(settings, client=_client(FakePhoneUse()), messenger=messenger)
+    done = phone.perform_step(_item(), {"id": "partner", "type": "text_partner", "to": "+14155550199",
+                                        "name": "Sam", "text": "Heads up: I'm on my way."})
+    assert done.ok and "called Sam" in done.detail
+    assert messenger.calls == [("+14155550199", "Hi, this is Hushbell, with a message from Ana Lopez. "
+                                                "Heads up: I'm on my way.")]
+
 
 def test_cloud_phone_steps_reach_the_parents_real_phone(settings):
     messenger = FakeMessenger()
@@ -333,6 +350,39 @@ def test_scan_to_sign_in_works_once(make_engine):
     first = phone.get(path, follow_redirects=False)
     assert first.status_code == 303 and "hushbell_session" in first.headers["set-cookie"]
     assert phone.get(path, follow_redirects=False).status_code == 410            # one use only
+
+
+def test_a_slow_claude_doesnt_delay_an_urgent_call(make_engine, settings):
+    import time
+
+    from conftest import FakeVoice
+
+    settings.urgent_sort_seconds = 0.2
+    voice = FakeVoice()
+    engine = make_engine(voice)
+
+    class SlowClaude:
+        def classify(self, *args, **kwargs):
+            time.sleep(1.5)
+            raise AssertionError("answered too late to matter")
+
+    engine.classifier = SlowClaude()
+    started = time.time()
+    item, _ = engine.ingest(IncomingMessage(app="Remind", sender="Nurse Kim", text="Maya has a fever, please pick her up"))
+    assert time.time() - started < 1.2
+    assert engine.store.get_item(item.id).category == "urgent" and voice.calls == [item.id]
+
+
+def test_the_call_voice_is_made_while_the_phone_rings(make_engine):
+    import threading
+
+    from conftest import FakeVoice
+
+    engine = make_engine(FakeVoice())
+    prepared = threading.Event()
+    engine.prepare_call = lambda item: prepared.set()
+    engine.ingest(IncomingMessage(app="Remind", sender="Nurse Kim", text="Maya has a fever, please pick her up"))
+    assert prepared.wait(2)
 
 
 def test_a_step_link_is_kept_for_the_page(make_engine, settings):

@@ -46,6 +46,15 @@ class TwilioVoice:
         message = self.client.messages.create(to=to, from_=self.settings.twilio_from_number, body=body[:600])
         return message.sid
 
+    def call_with_message(self, to: str, words: str) -> str:
+        """Call someone and say a short message twice (used when a text can't be sent)."""
+        from xml.sax.saxutils import escape
+
+        twiml = (f'<Response><Pause length="1"/><Say>{escape(words)}</Say><Pause length="1"/>'
+                 f"<Say>Again: {escape(words)}</Say></Response>")
+        call = self.client.calls.create(to=to, from_=self.settings.twilio_from_number, twiml=twiml)
+        return call.sid
+
     def call_later(self, at, words: str) -> threading.Timer:
         """Call the parent at `at` (a datetime) and say `words`: the "time to leave" reminder."""
         from datetime import datetime

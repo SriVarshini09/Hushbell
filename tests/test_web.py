@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 
 from hushbell.web.app import create_app
 
-FEVER = {"app": "Remind", "sender": "Ms. Rivera Â· Room 12",
-         "text": "Maya has a fever (101Â°F). Please pick her up by 1pm."}
+FEVER = {"app": "Remind", "sender": "Ms. Rivera · Room 12",
+         "text": "Maya has a fever (101°F). Please pick her up by 1pm."}
 AUTH = {"Authorization": "Bearer test-token"}
 
 

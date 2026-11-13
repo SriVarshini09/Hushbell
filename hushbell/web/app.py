@@ -45,7 +45,7 @@ def demo_messages(children: list[str]) -> list[dict]:
     """Example school messages, about the family's own child so they read as real."""
     child = (children[0].strip() if children and children[0].strip() else "Maya")
     child = child[:1].upper() + child[1:]
-    teacher = "Ms. Rivera Â· Room 12"
+    teacher = "Ms. Rivera · Room 12"
     return [
         {"app": "Remind", "sender": teacher, "text": "Bake sale next Friday! Cookie donations welcome."},
         {"app": "Remind", "sender": teacher,
@@ -58,7 +58,7 @@ def demo_messages(children: list[str]) -> list[dict]:
         {"app": "Gmail", "sender": "Lincoln Elementary",
          "text": "Picture day is next Thursday. Retake forms are in the front office."},
         {"app": "Remind", "sender": teacher,
-         "text": f"{child} has a fever (101Â°F) and needs to be picked up by {demo_pickup_time()}."},
+         "text": f"{child} has a fever (101°F) and needs to be picked up by {demo_pickup_time()}."},
     ]
 
 
@@ -107,6 +107,8 @@ def create_app(engine: Engine) -> FastAPI:
             raise HTTPException(status_code=401, detail="Sign in with your Hushbell access token.")
 
     narrator = Narrator(settings)
+    if narrator.enabled:
+        engine.prepare_call = lambda item: narrator.narrate(voice_twiml(item, settings.public_base_url))
 
     async def xml(body: str) -> Response:
         """A TwiML answer for Twilio, spoken in the ElevenLabs voice when it is set up."""

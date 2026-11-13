@@ -433,8 +433,15 @@ class PhoneUsePhone:
             raise UnsafeAction("Texts and reminder calls go through Hushbell's Twilio number, which isn't set up.")
         if kind == "text_partner":
             who = self.settings.parent_name.strip().title() or "Your co-parent"
-            self.messenger.send_text(step["to"], f"{who} (via Hushbell): {clean(step['text'], 300)}")
-            return ActionResult(True, f"Texted {step.get('name', 'your co-parent')} from Hushbell's number.")
+            name = step.get("name", "your co-parent")
+            words = clean(step["text"], 300)
+            try:
+                self.messenger.send_text(step["to"], f"{who} (via Hushbell): {words}")
+                return ActionResult(True, f"Texted {name} from Hushbell's number.")
+            except Exception as exc:  # noqa: BLE001 - US carriers block texts from unregistered numbers
+                log.warning("Text to the co-parent failed, calling instead: %s", exc)
+            self.messenger.call_with_message(step["to"], f"Hi, this is Hushbell, with a message from {who}. {words}")
+            return ActionResult(True, f"The text couldn't go out, so I called {name} with the message.")
         if kind == "set_alarm":
             # The cloud phone's alarm wouldn't ring in the parent's pocket, so Hushbell calls instead.
             from hushbell.plan import spoken_time

@@ -245,10 +245,15 @@ Forwarding apps (Tasker, MacroDroid) or scripts can also post messages to
 
 ## Privacy and safety
 
-- **Runs on your own phone and laptop.** There is no Hushbell server. Messages are stored in a
-  SQLite file in `~/.hushbell`.
+- **You choose where it runs.** In the default mode it runs on your own phone and laptop, with no
+  Hushbell server. In cloud mode the school apps sit on a PhoneUse cloud phone in your PhoneUse
+  account, and Hushbell can run on your Replit. Either way, messages are stored in a SQLite file in
+  Hushbell's data folder (`~/.hushbell`).
 - **What leaves your laptop:** the text of each school message goes to the Claude API to be
-  sorted, and urgent summaries are read to you by Twilio on the call.
+  sorted, and urgent summaries are read to you by Twilio on the call. In cloud mode,
+  screenshots of the cloud phone's notification shade also go to Claude (only when they change),
+  and PhoneUse keeps its own screen records as its docs describe. With ElevenLabs on, the words of
+  each call go to ElevenLabs to be spoken; with Tavily on, Ask's web searches go to Tavily.
 - **Personal messages are never read.** For apps like WhatsApp and Gmail, only notifications that
   mention your keywords are processed.
 - **Nothing happens without your OK.** Replies run only after you press 1 or tap the card, and
@@ -256,7 +261,9 @@ Forwarding apps (Tasker, MacroDroid) or scripts can also post messages to
   link, never by keypress on a call. The agent is told never to enter passwords or payment
   details and to stop if a form asks for them.
 - **Only the co-parent you name can be texted**, only after your OK, and you see the exact text
-  first. Hushbell never messages anyone else in your contacts.
+  first. Hushbell never messages anyone else in your contacts. In cloud mode the text comes from
+  Hushbell's Twilio number; if the carrier blocks it (US numbers need A2P registration to text),
+  Hushbell calls them with the same words instead.
 - **The phone agent only gets a cleaned-up task.** The original message is never passed to it;
   the sender's name and reply are stripped to one quoted line, and the task tells the agent to
   ignore instructions it sees on screen.

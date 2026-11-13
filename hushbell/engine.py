@@ -16,6 +16,7 @@ import logging
 import threading
 import time
 from concurrent.futures import Executor, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -69,6 +70,7 @@ class Engine:
         self.store = store
         self.classifier = classifier
         self.assistant = assistant
+        self.prepare_call = None      # optional: get a call's audio ready while the phone rings (web/app.py)
         self.phone = phone
         self.voice = voice
         self.rules = SafetyRules(settings.children, settings.extra_urgent_words)
@@ -377,10 +379,25 @@ class Engine:
         self.store.add_event("sorted", f"{label} · {why}", item.id)
         return {"category": decision.category}
 
+    def _classify(self, item: Item, deadline: float | None) -> Decision:
+        """Ask Claude. With a deadline (a safety word was heard), don't let a slow answer delay the call."""
+        if deadline is None:
+            return self.classifier.classify(item.app, item.sender, item.text, also_seen_in=item.sources[1:])
+        pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="hushbell-sort")
+        try:
+            future = pool.submit(self.classifier.classify, item.app, item.sender, item.text,
+                                 also_seen_in=item.sources[1:])
+            try:
+                return future.result(timeout=deadline)
+            except FuturesTimeout:
+                raise RuntimeError(f"no answer within {deadline:g} s, and this one can't wait") from None
+        finally:
+            pool.shutdown(wait=False)
+
     def decide(self, item: Item) -> Decision:
         hit = self.rules.check(f"{item.sender}\n{item.text}")
         try:
-            decision = self.classifier.classify(item.app, item.sender, item.text, also_seen_in=item.sources[1:])
+            decision = self._classify(item, self.settings.urgent_sort_seconds if hit else None)
         except Exception as exc:  # noqa: BLE001 - any sorting failure falls back to the safe default
             log.warning("Sorting fell back to rules for %s: %s", item.id, exc)
             self.store.add_event("sorting", f"Claude was unavailable ({exc}). Used the safe default.", item.id)
@@ -411,6 +428,9 @@ class Engine:
             self.store.add_event("no call", "Calls are not set up, so this is waiting at the top of the Hushbell page",
                                  item.id)
             return
+        if self.prepare_call:
+            # Make the call's spoken lines (ElevenLabs) while the phone rings, so there's no pause on answer.
+            threading.Thread(target=self._prepare, args=(item,), daemon=True, name="hushbell-prepare").start()
         try:
             self.voice.place_call(item.id)
         except Exception as exc:  # noqa: BLE001 - a failed call must not lose the item
@@ -422,6 +442,12 @@ class Engine:
         self.store.update_item(item.id, status=STATUS_CALLING, call_attempts=item.call_attempts + 1)
         self.store.add_event("calling", f"Calling {_mask(self.settings.parent_phone)} through Do Not Disturb",
                              item.id)
+
+    def _prepare(self, item: Item) -> None:
+        try:
+            self.prepare_call(item)
+        except Exception:  # noqa: BLE001 - only a head start; the call works without it
+            log.info("Couldn't prepare the call's voice ahead of time", exc_info=True)
 
     def _node_ask_on_page(self, state: FlowState) -> FlowState:
         item = self._item(state)

@@ -92,7 +92,7 @@ class Settings:
     phoneuse_url: str = "https://mcp.phoneuse.com"
     phoneuse_max_steps: int = 30
     phoneuse_timeout: int = 300        # seconds to wait for one task on the cloud phone
-    phoneuse_poll_seconds: float = 20.0
+    phoneuse_poll_seconds: float = 6.0     # a screenshot PhoneUse doesn't bill; Claude reads only changes
     reader_model: str = "claude-haiku-5-5"   # reads notification screenshots from the cloud phone
 
     # ElevenLabs: a natural voice for Hushbell's calls (Twilio's own voice when not set)
@@ -105,6 +105,7 @@ class Settings:
 
     # Safety rules
     extra_urgent_words: list[str] = field(default_factory=list)
+    urgent_sort_seconds: float = 8.0   # how long a safety-word message waits for Claude before the call
 
     # Calls (Twilio)
     twilio_account_sid: str = ""
@@ -200,7 +201,8 @@ class Settings:
             phoneuse_url=(env("HUSHBELL_PHONEUSE_URL") or "https://mcp.phoneuse.com").rstrip("/"),
             phoneuse_max_steps=int(env("HUSHBELL_PHONEUSE_STEPS") or 30),
             phoneuse_timeout=int(env("HUSHBELL_PHONEUSE_TIMEOUT") or 300),
-            phoneuse_poll_seconds=float(env("HUSHBELL_PHONEUSE_POLL_SECONDS") or 20.0),
+            phoneuse_poll_seconds=float(env("HUSHBELL_PHONEUSE_POLL_SECONDS") or 6.0),
+            urgent_sort_seconds=float(env("HUSHBELL_URGENT_SORT_SECONDS") or 8.0),
             reader_model=env("HUSHBELL_READER_MODEL") or "claude-haiku-5-5",
             elevenlabs_api_key=(env("ELEVENLABS_API_KEY") or "").strip(),
             elevenlabs_voice=env("HUSHBELL_ELEVENLABS_VOICE") or "JBFqnCBsd6RMkjVDRZzb",
