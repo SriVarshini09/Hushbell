@@ -91,6 +91,11 @@ class ClaudeClassifier:
         return self._client
 
     def classify(self, app: str, sender: str, text: str, also_seen_in: list[str] | None = None) -> Decision:
+        from hushbell.tracing import traced
+
+        return traced("Sort with Claude", self._classify, app, sender, text, also_seen_in, run_type="llm")
+
+    def _classify(self, app: str, sender: str, text: str, also_seen_in: list[str] | None = None) -> Decision:
         family = []
         if self.settings.children:
             family.append(f"Children: {', '.join(self.settings.children)}")

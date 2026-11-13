@@ -1,0 +1,15 @@
+# Hushbell on Replit: an always-on https address for the page, the app install and Twilio's calls.
+# Put your keys in Replit's Secrets (ANTHROPIC_API_KEY, HUSHBELL_ACCESS_TOKEN, TWILIO_*, PHONEUSE_API_KEY, ...).
+# For a cloud phone, add the secret HUSHBELL_PHONE_BACKEND=phoneuse.
+# For a demo with no phone at all, add the secret HUSHBELL_RUN_FLAGS=--no-phone --dry-run --demo
+# When you publish, choose a Reserved VM: Hushbell keeps reading the phone between visits.
+modules = ["python-3.12"]
+run = ["sh", "-c", "pip install -q -e . && hushbell run $HUSHBELL_RUN_FLAGS"]
+
+[deployment]
+build = ["sh", "-c", "pip install -q -e ."]
+run = ["sh", "-c", "hushbell run $HUSHBELL_RUN_FLAGS"]
+
+[[ports]]
+localPort = 8000
+externalPort = 80

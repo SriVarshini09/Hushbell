@@ -18,6 +18,7 @@ from fastapi.concurrency import run_in_threadpool
 from hushbell import __version__
 from hushbell.engine import Engine
 from hushbell.models import IncomingMessage
+from hushbell.narrator import Narrator
 from hushbell.plan import CALL_APP, pretty_phone, same_phone, valid_phone
 from hushbell.voice import (
     gather_twiml, inbound_check_emergency_twiml, inbound_done_twiml, inbound_greeting_twiml, needs_page,
@@ -44,7 +45,7 @@ def demo_messages(children: list[str]) -> list[dict]:
     """Example school messages, about the family's own child so they read as real."""
     child = (children[0].strip() if children and children[0].strip() else "Maya")
     child = child[:1].upper() + child[1:]
-    teacher = "Ms. Rivera · Room 12"
+    teacher = "Ms. Rivera Â· Room 12"
     return [
         {"app": "Remind", "sender": teacher, "text": "Bake sale next Friday! Cookie donations welcome."},
         {"app": "Remind", "sender": teacher,
@@ -57,7 +58,7 @@ def demo_messages(children: list[str]) -> list[dict]:
         {"app": "Gmail", "sender": "Lincoln Elementary",
          "text": "Picture day is next Thursday. Retake forms are in the front office."},
         {"app": "Remind", "sender": teacher,
-         "text": f"{child} has a fever (101°F) and needs to be picked up by {demo_pickup_time()}."},
+         "text": f"{child} has a fever (101Â°F) and needs to be picked up by {demo_pickup_time()}."},
     ]
 
 
@@ -81,6 +82,8 @@ FAVICON = (
     '<path d="M16 6a6 6 0 0 0-6 6v5l-2.5 3.5h17L22 17v-5a6 6 0 0 0-6-6zm-2.5 17a2.5 2.5 0 0 0 5 0z" fill="#14203A"/></svg>'
 )
 
+ICONS = {"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"}
+PAIR_SECONDS = 600
 MAX_LOGIN_FAILURES = 8
 LOGIN_WINDOW_SECONDS = 600
 
@@ -102,6 +105,14 @@ def create_app(engine: Engine) -> FastAPI:
     def require(request: Request) -> None:
         if not authed(request):
             raise HTTPException(status_code=401, detail="Sign in with your Hushbell access token.")
+
+    narrator = Narrator(settings)
+
+    async def xml(body: str) -> Response:
+        """A TwiML answer for Twilio, spoken in the ElevenLabs voice when it is set up."""
+        if narrator.enabled:
+            body = await run_in_threadpool(narrator.narrate, body)
+        return Response(body, media_type="application/xml")
 
     async def twilio_ok(request: Request) -> dict:
         form = dict(await request.form())
@@ -166,6 +177,76 @@ def create_app(engine: Engine) -> FastAPI:
     def favicon():
         return Response(FAVICON, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
+    # ---- installable app (PWA) -------------------------------------------
+
+    @app.get("/manifest.webmanifest")
+    def manifest():
+        return Response((STATIC / "manifest.webmanifest").read_bytes(), media_type="application/manifest+json",
+                        headers={"Cache-Control": "public, max-age=3600"})
+
+    @app.get("/sw.js")
+    def service_worker():
+        return Response((STATIC / "sw.js").read_bytes(), media_type="text/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+    @app.get("/offline.html", response_class=HTMLResponse)
+    def offline():
+        return HTMLResponse((STATIC / "offline.html").read_text(encoding="utf-8"))
+
+    @app.get("/apple-touch-icon.png")
+    @app.get("/icons/{name}")
+    def icon(name: str = "apple-touch-icon.png"):
+        if name not in ICONS:
+            raise HTTPException(status_code=404)
+        return Response((STATIC / "icons" / name).read_bytes(), media_type="image/png",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+    # One-time links that sign a phone in by scanning a code on the laptop, so nobody types the token.
+    pairings: dict[str, float] = {}
+
+    def phone_address(request: Request) -> str:
+        if settings.public_base_url:
+            return settings.public_base_url
+        from hushbell.tunnel import lan_ip
+
+        host = request.url.hostname or ""
+        if host in ("localhost", "127.0.0.1", "::1") and lan_ip():
+            return f"http://{lan_ip()}:{request.url.port or settings.port}"
+        return str(request.base_url).rstrip("/")
+
+    @app.post("/api/pair")
+    def pair(request: Request):
+        """A QR code with a one-time sign-in link for the parent's phone (good for 10 minutes, once)."""
+        require(request)
+        import secrets
+
+        import segno
+
+        now = time.time()
+        for code, expiry in list(pairings.items()):
+            if expiry < now:
+                pairings.pop(code, None)
+        code = secrets.token_urlsafe(18)
+        pairings[code] = now + PAIR_SECONDS
+        url = f"{phone_address(request)}/pair/{code}"
+        svg = segno.make(url, error="m").svg_inline(scale=5, dark="#14203A", light="#FFFFFF", border=2)
+        return {"url": url, "svg": svg, "expires_in": PAIR_SECONDS,
+                "secure": url.startswith("https://")}
+
+    @app.get("/pair/{code}")
+    def paired(code: str, request: Request):
+        expiry = pairings.pop(code, 0)
+        if expiry < time.time():
+            html = (STATIC / "login.html").read_text(encoding="utf-8").replace(
+                "<!--error-->", '<p class="error" role="alert">That sign-in code was used or has expired. '
+                                "Make a new one on the laptop, or type the access token.</p>")
+            return HTMLResponse(html, status_code=410)
+        engine.store.add_event("phone", "A phone signed in by scanning the code")
+        response = RedirectResponse("/?installed=1", status_code=303)
+        response.set_cookie(COOKIE, session_value, httponly=True, samesite="lax", max_age=30 * 24 * 3600,
+                            secure=request.url.scheme == "https" or settings.public_base_url.startswith("https://"))
+        return response
+
     @app.get("/healthz")
     def healthz():
         return {"ok": True, "version": __version__}
@@ -196,7 +277,8 @@ def create_app(engine: Engine) -> FastAPI:
     @app.post("/api/ask")
     def ask(body: AskBody, request: Request):
         require(request)
-        return {"answer": engine.ask(body.question)}
+        answer = engine.ask(body.question)
+        return {"answer": answer, "searches": list(getattr(engine.assistant, "last_searches", []) or [])}
 
     @app.post("/api/items/{item_id}/retry")
     def retry(item_id: str, request: Request):
@@ -258,7 +340,7 @@ def create_app(engine: Engine) -> FastAPI:
     async def twilio_voice(item_id: str, request: Request, attempt: int = 1):
         await twilio_ok(request)
         item = engine.store.get_item(item_id)
-        return Response(voice_twiml(item, settings.public_base_url, attempt), media_type="application/xml")
+        return await xml(voice_twiml(item, settings.public_base_url, attempt))
 
     @app.post("/twilio/gather/{item_id}")
     async def twilio_gather(item_id: str, request: Request):
@@ -271,9 +353,8 @@ def create_app(engine: Engine) -> FastAPI:
                                    item_id)
         elif item and digit in ("1", "2"):
             accepted = engine.resume(item_id, digit == "1", "call")
-        return Response(gather_twiml(digit, item, settings.public_base_url, accepted,
-                                     caller_id=settings.twilio_from_number),
-                        media_type="application/xml")
+        return await xml(gather_twiml(digit, item, settings.public_base_url, accepted,
+                                      caller_id=settings.twilio_from_number))
 
     # ---- someone calls Hushbell's number -----------------------------------
     # The school (or a judge playing the school nurse) calls and speaks. Hushbell writes down
@@ -285,8 +366,6 @@ def create_app(engine: Engine) -> FastAPI:
     def is_parent(number: str) -> bool:
         return bool(settings.parent_phone) and same_phone(number, settings.parent_phone)
 
-    def xml(body: str) -> Response:
-        return Response(body, media_type="application/xml")
 
     @app.post("/twilio/inbound")
     async def twilio_inbound(request: Request, attempt: int = 1):
@@ -294,10 +373,10 @@ def create_app(engine: Engine) -> FastAPI:
         caller = str(form.get("From", ""))
         if is_parent(caller):
             engine.store.add_event("ask", "You called Hushbell to ask a question")
-            return xml(parent_ask_twiml(settings))
+            return await xml(parent_ask_twiml(settings))
         if attempt == 1:
             engine.store.add_event("incoming call", f"Hushbell answered a call from {pretty_phone(caller) or 'a hidden number'}")
-        return xml(inbound_greeting_twiml(settings, attempt))
+        return await xml(inbound_greeting_twiml(settings, attempt))
 
     @app.post("/twilio/inbound/heard")
     async def twilio_inbound_heard(request: Request):
@@ -305,28 +384,28 @@ def create_app(engine: Engine) -> FastAPI:
         caller = str(form.get("From", ""))
         said = " ".join(str(form.get("SpeechResult", "")).split())[:1000]
         if not said:
-            return xml(inbound_greeting_twiml(settings, attempt=2))
+            return await xml(inbound_greeting_twiml(settings, attempt=2))
         if engine.rules.check(said):
             take_call_message(caller, said)
-            return xml(inbound_done_twiml(settings, urgent=True))
+            return await xml(inbound_done_twiml(settings, urgent=True))
         now = time.time()
         for sid in [s for s, v in pending_calls.items() if now - v[2] > 600]:
             pending_calls.pop(sid, None)
         pending_calls[str(form.get("CallSid", ""))] = (caller, said, now)
-        return xml(inbound_check_emergency_twiml(settings))
+        return await xml(inbound_check_emergency_twiml(settings))
 
     @app.post("/twilio/inbound/emergency")
     async def twilio_inbound_emergency(request: Request):
         form = await twilio_ok(request)
         pending = pending_calls.pop(str(form.get("CallSid", "")), None)
         if pending is None:
-            return xml(inbound_done_twiml(settings, urgent=False))
+            return await xml(inbound_done_twiml(settings, urgent=False))
         caller, said, _ = pending
         urgent = str(form.get("Digits", "")).strip() == "1"
         if urgent:
             said += " (The caller pressed 1 to say this is an emergency.)"
         take_call_message(caller, said)
-        return xml(inbound_done_twiml(settings, urgent=urgent))
+        return await xml(inbound_done_twiml(settings, urgent=urgent))
 
     def take_call_message(caller: str, said: str) -> None:
         sender = caller if valid_phone(caller) else "Hidden number"
@@ -336,18 +415,26 @@ def create_app(engine: Engine) -> FastAPI:
     async def twilio_ask(request: Request):
         form = await twilio_ok(request)
         if not is_parent(str(form.get("From", ""))):
-            return xml(inbound_done_twiml(settings, urgent=False))
+            return await xml(inbound_done_twiml(settings, urgent=False))
         question = " ".join(str(form.get("SpeechResult", "")).split())[:300]
         if not question:
-            return xml(parent_ask_twiml(settings, answer="Sorry, I didn't catch that."))
+            return await xml(parent_ask_twiml(settings, answer="Sorry, I didn't catch that."))
         answer = await run_in_threadpool(engine.ask, question)
         engine.store.add_event("ask", f"You asked by phone: {question}")
-        return xml(parent_ask_twiml(settings, answer=answer))
+        return await xml(parent_ask_twiml(settings, answer=answer))
 
     @app.post("/twilio/test")
     async def twilio_test(request: Request):
         await twilio_ok(request)
-        return Response(ring_test_twiml(), media_type="application/xml")
+        return await xml(ring_test_twiml())
+
+    @app.get("/voice/{clip}.mp3")
+    def voice_clip(clip: str):
+        """An ElevenLabs clip for a call. Twilio fetches these; the names can't be guessed."""
+        path = narrator.path(clip)
+        if path is None:
+            raise HTTPException(status_code=404)
+        return Response(path.read_bytes(), media_type="audio/mpeg", headers={"Cache-Control": "private, max-age=3600"})
 
     @app.post("/twilio/status/{item_id}")
     async def twilio_status(item_id: str, request: Request):

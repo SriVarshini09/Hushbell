@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0B111D">
 <title>Hushbell · Live</title>
 <style>
 :root{
@@ -30,6 +32,8 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .tag{color:var(--muted);font-size:1.05rem}
 .live{display:flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
 .live a{color:var(--faint)}
+.tools{display:flex;gap:.35rem;margin-right:.6rem}
+.tools span{font-size:.72rem;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:.1rem .55rem}
 .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--ok)}
 
 /* Do Not Disturb strip with the story in four numbers */
@@ -155,13 +159,13 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
       <span class="bell"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>HUSHBELL</span>
       <span class="tag">Hushed all day. Rings when your kid needs you.</span>
     </div>
-    <div class="live"><span class="dot" aria-hidden="true"></span><span id="clock">Live</span> · <a href="/">parent's page</a></div>
+    <div class="live"><span class="tools" id="tools"></span><span class="dot" aria-hidden="true"></span><span id="clock">Live</span> · <a href="/">parent's page</a></div>
   </header>
 
   <section class="dnd" aria-label="The parent's phone">
     <div class="phone-state">
       <div class="moon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div>
-      <div><b id="whosePhone">The parent's phone</b><span>Do Not Disturb is on. Hushbell is not.</span></div>
+      <div><b id="whosePhone">The parent's phone</b><span id="phoneLine">Do Not Disturb is on. Hushbell is not.</span></div>
     </div>
     <div class="flow">
       <div class="num"><b id="nMsgs">0</b><span>school messages</span></div><span class="arrow" aria-hidden="true">→</span>
@@ -396,6 +400,14 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     const who = parentName(s);
     $("whosePhone").textContent = who ? `${who}'s phone` : "The parent's phone";
     $("tapsLabel").textContent = who ? `taps by ${who}` : "taps by the parent";
+    const st = s.setup;
+    $("phoneLine").textContent = st.cloud_phone
+      ? "Do Not Disturb is on, and no school apps: they live on a PhoneUse cloud phone."
+      : "Do Not Disturb is on. Hushbell is not.";
+    const tools = ["Claude", "LangGraph", st.cloud_phone && "PhoneUse", st.voice, st.web_search && "Tavily",
+      st.tracing && "LangSmith", st.hosted].filter(Boolean);
+    const toolsHtml = tools.map(t => `<span>${esc(t)}</span>`).join("");
+    if ($("tools")._html !== toolsHtml) { $("tools").innerHTML = toolsHtml; $("tools")._html = toolsHtml; }
     renderBanner(s);
 
     const items = s.items.slice(0, 12).sort((a, b) => {

@@ -43,8 +43,8 @@ def test_env_file_values_are_replaced_in_place(tmp_path):
 def test_wizard_keeps_existing_answers_when_you_press_enter(tmp_path):
     env = tmp_path / ".env"
     env.write_text("HUSHBELL_CHILDREN=Maya\nHUSHBELL_PARENT_NAME=\n", encoding="utf-8")
-    answers = iter(["", "Ana Lopez", "", "", "", "", "", "", "", ""])
-    run_wizard(env, ask=lambda q: next(answers), ask_secret=lambda q: "", out=lambda *a: None)
+    answers = iter(["", "Ana Lopez"])
+    run_wizard(env, ask=lambda q: next(answers, ""), ask_secret=lambda q: "", out=lambda *a: None)
     values = read_env_values(env)
     assert values["HUSHBELL_CHILDREN"] == "Maya" and values["HUSHBELL_PARENT_NAME"] == "Ana Lopez"
 
@@ -93,7 +93,7 @@ def test_wizard_repairs_a_key_pasted_twice(tmp_path):
     env.write_text("ANTHROPIC_API_KEY=\n", encoding="utf-8")
     said = []
     secrets = iter([KEY + KEY, ""])
-    run_wizard(env, ask=lambda q: "", ask_secret=lambda q: next(secrets), out=lambda *a: said.append(a[0]))
+    run_wizard(env, ask=lambda q: "", ask_secret=lambda q: next(secrets, ""), out=lambda *a: said.append(a[0]))
     assert read_env_values(env)["ANTHROPIC_API_KEY"] == KEY
     assert "  The key was pasted 2 times. Saved one copy." in said
 

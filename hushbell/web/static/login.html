@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#14203A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hushbell">
 <title>Hushbell · Sign in</title>
 <style>
 :root{--paper:#F2F4F7;--ink:#14203A;--muted:#5C6679;--line:#D3DAE4;--card:#fff;--bell:#F4B400;--urgent:#D2433F;color-scheme:light}
@@ -32,6 +38,8 @@ input:focus-visible,button:focus-visible{outline:3px solid var(--bell);outline-o
     <input id="token" name="token" type="password" autocomplete="current-password" required autofocus>
     <button type="submit">Open Hushbell</button>
   </form>
+  <p style="margin:16px 0 0;font-size:13px">On your phone? On the laptop page, press <b>Open on your phone</b> and scan the code instead.</p>
 </main>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>

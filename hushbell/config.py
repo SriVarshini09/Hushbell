@@ -11,6 +11,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from hushbell.tunnel import detect_replit
+
 # Android package name -> (label shown to the parent, kind).
 # "school": every notification from the app is a school message.
 # "mixed": the app also carries personal messages, so only notifications that
@@ -75,7 +77,7 @@ class Settings:
     backfill: bool = False
 
     # Phone (acting)
-    phone_backend: str = "mobilerun"  # "mobilerun" or "dry-run"
+    phone_backend: str = "mobilerun"  # "mobilerun", "phoneuse" (a PhoneUse cloud phone) or "dry-run"
     mobilerun_cmd: str = "mobilerun"
     mobilerun_steps: int = 20
     mobilerun_reasoning: bool = False
@@ -83,6 +85,23 @@ class Settings:
     mobilerun_provider: str = ""
     mobilerun_model: str = ""
     macros: dict[str, str] = field(default_factory=dict)
+
+    # PhoneUse: the school apps live on a cloud Android phone instead of the parent's own phone.
+    phoneuse_api_key: str = ""
+    phoneuse_device: str = ""          # empty: the first online cloud phone on the account
+    phoneuse_url: str = "https://mcp.phoneuse.com"
+    phoneuse_max_steps: int = 30
+    phoneuse_timeout: int = 300        # seconds to wait for one task on the cloud phone
+    phoneuse_poll_seconds: float = 20.0
+    reader_model: str = "claude-haiku-5-5"   # reads notification screenshots from the cloud phone
+
+    # ElevenLabs: a natural voice for Hushbell's calls (Twilio's own voice when not set)
+    elevenlabs_api_key: str = ""
+    elevenlabs_voice: str = "JBFqnCBsd6RMkjVDRZzb"
+    elevenlabs_model: str = "eleven_flash_v2_5"
+
+    # Tavily: lets "Ask Hushbell" look things up on the web (museum hours, school closures)
+    tavily_api_key: str = ""
 
     # Safety rules
     extra_urgent_words: list[str] = field(default_factory=list)
@@ -111,6 +130,16 @@ class Settings:
             [self.twilio_account_sid, self.twilio_auth_token, self.twilio_from_number,
              self.parent_phone, self.public_base_url]
         )
+
+    @property
+    def cloud_phone(self) -> bool:
+        """The school apps run on a PhoneUse cloud phone (no USB phone, no laptop needed)."""
+        return self.phone_backend == "phoneuse"
+
+    @property
+    def tracing(self) -> bool:
+        """LangSmith tracing is on (LANGSMITH_TRACING=true and a LANGSMITH_API_KEY)."""
+        return _bool(os.environ.get("LANGSMITH_TRACING"), False) and bool(os.environ.get("LANGSMITH_API_KEY"))
 
     @property
     def db_path(self) -> Path:
@@ -166,12 +195,23 @@ class Settings:
             mobilerun_provider=env("HUSHBELL_MOBILERUN_PROVIDER") or "",
             mobilerun_model=env("HUSHBELL_MOBILERUN_MODEL") or "",
             macros=macros,
+            phoneuse_api_key=(env("PHONEUSE_API_KEY") or "").strip(),
+            phoneuse_device=(env("HUSHBELL_PHONEUSE_DEVICE") or "").strip(),
+            phoneuse_url=(env("HUSHBELL_PHONEUSE_URL") or "https://mcp.phoneuse.com").rstrip("/"),
+            phoneuse_max_steps=int(env("HUSHBELL_PHONEUSE_STEPS") or 30),
+            phoneuse_timeout=int(env("HUSHBELL_PHONEUSE_TIMEOUT") or 300),
+            phoneuse_poll_seconds=float(env("HUSHBELL_PHONEUSE_POLL_SECONDS") or 20.0),
+            reader_model=env("HUSHBELL_READER_MODEL") or "claude-haiku-5-5",
+            elevenlabs_api_key=(env("ELEVENLABS_API_KEY") or "").strip(),
+            elevenlabs_voice=env("HUSHBELL_ELEVENLABS_VOICE") or "JBFqnCBsd6RMkjVDRZzb",
+            elevenlabs_model=env("HUSHBELL_ELEVENLABS_MODEL") or "eleven_flash_v2_5",
+            tavily_api_key=(env("TAVILY_API_KEY") or "").strip(),
             extra_urgent_words=_list(env("HUSHBELL_EXTRA_URGENT_WORDS")),
             twilio_account_sid=env("TWILIO_ACCOUNT_SID") or "",
             twilio_auth_token=env("TWILIO_AUTH_TOKEN") or "",
             twilio_from_number=env("TWILIO_FROM_NUMBER") or "",
             parent_phone=env("HUSHBELL_PARENT_PHONE") or "",
-            public_base_url=(env("HUSHBELL_PUBLIC_URL") or "").rstrip("/"),
+            public_base_url=(env("HUSHBELL_PUBLIC_URL") or detect_replit()).rstrip("/"),
             twilio_validate=_bool(env("HUSHBELL_TWILIO_VALIDATE"), True),
             twilio_autoconfig=_bool(env("HUSHBELL_TWILIO_AUTOCONFIG"), True),
             redial_seconds=int(env("HUSHBELL_REDIAL_SECONDS") or 60),

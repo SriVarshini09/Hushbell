@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14203A">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Hushbell · offline</title>
+<style>
+:root{--paper:#F2F4F7;--ink:#14203A;--muted:#5C6679;--card:#fff;--line:#D3DAE4}
+@media (prefers-color-scheme:dark){:root{--paper:#0F1522;--ink:#E8ECF4;--muted:#9AA5BA;--card:#171F30;--line:#2A3448}}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:420px;margin:12vh auto 0;padding:24px;background:var(--card);border:1px solid var(--line);border-radius:18px}
+img{width:56px;height:56px;border-radius:14px}
+h1{font-size:20px;margin:14px 0 6px}
+p{color:var(--muted);margin:0 0 14px}
+button{font:inherit;font-weight:700;border-radius:10px;padding:10px 16px;border:0;background:#14203A;color:#fff}
+</style>
+</head>
+<body>
+<main>
+  <img src="/icons/icon-192.png" alt="">
+  <h1>Hushbell can't be reached right now</h1>
+  <p>Your phone is offline, or the computer running Hushbell is. Urgent calls still come through as soon as Hushbell is back.</p>
+  <button type="button" onclick="location.reload()">Try again</button>
+</main>
+</body>
+</html>

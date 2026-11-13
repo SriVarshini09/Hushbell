@@ -9,6 +9,7 @@ second call from the same number within a few minutes ring through.
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Protocol
 
 from hushbell.config import Settings
@@ -39,6 +40,31 @@ class TwilioVoice:
             status_callback_method="POST",
         )
         return call.sid
+
+    def send_text(self, to: str, body: str) -> str:
+        """A text from Hushbell's number (cloud-phone mode: the co-parent heads-up)."""
+        message = self.client.messages.create(to=to, from_=self.settings.twilio_from_number, body=body[:600])
+        return message.sid
+
+    def call_later(self, at, words: str) -> threading.Timer:
+        """Call the parent at `at` (a datetime) and say `words`: the "time to leave" reminder."""
+        from datetime import datetime
+        from xml.sax.saxutils import escape
+
+        twiml = (f'<Response><Pause length="1"/><Say>{escape(words)}</Say><Pause length="1"/>'
+                 f"<Say>{escape(words)}</Say></Response>")
+
+        def ring() -> None:
+            try:
+                self.client.calls.create(to=self.settings.parent_phone, from_=self.settings.twilio_from_number,
+                                         twiml=twiml)
+            except Exception:  # noqa: BLE001 - a reminder must not take Hushbell down
+                log.exception("Reminder call failed")
+
+        timer = threading.Timer(max(0.0, (at - datetime.now()).total_seconds()), ring)
+        timer.daemon = True
+        timer.start()
+        return timer
 
     def place_test_call(self) -> str:
         """Ring the parent with a short test message, to check it gets through Do Not Disturb."""

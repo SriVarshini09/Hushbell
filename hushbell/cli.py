@@ -91,10 +91,10 @@ def main(argv: list[str] | None = None) -> int:
 def cmd_run(settings: Settings, args) -> int:
     import uvicorn
 
-    from hushbell.ingest.adb import AdbNotificationSource
-    from hushbell.runtime import DigestClock, PhoneReader, build_engine
+    from hushbell.runtime import DigestClock, PhoneReader, build_engine, make_reader_source
     from hushbell.web.app import create_app
 
+    cloud = settings.cloud_phone      # decided before --dry-run swaps the actions out
     if args.no_phone:
         settings.read_phone = False
     if args.dry_run:
@@ -120,10 +120,12 @@ def cmd_run(settings: Settings, args) -> int:
 
     reader = None
     if settings.read_phone:
-        source = AdbNotificationSource(settings, store=engine.store)
+        source = make_reader_source(engine, cloud)
         if source.available():
-            reader = PhoneReader(engine, source)
+            reader = PhoneReader(engine, source, settings.phoneuse_poll_seconds if cloud else None)
             reader.start()
+        elif cloud:
+            print("[!!] PHONEUSE_API_KEY is not set. Not reading the cloud phone. Run `hushbell doctor`.")
         else:
             print(f"[!!] adb not found ('{settings.adb_path}'). Not reading the phone. Run `hushbell doctor`.")
     clock = DigestClock(engine)
@@ -131,16 +133,23 @@ def cmd_run(settings: Settings, args) -> int:
 
     print()
     lan = _lan_ip()
-    on_phone = f"http://{lan}:{settings.port}" if lan else f"http://<this laptop's IP>:{settings.port}"
+    on_phone = settings.public_base_url or (f"http://{lan}:{settings.port}" if lan else
+                                            f"http://<this laptop's IP>:{settings.port}")
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
+    from hushbell.tracing import enabled as tracing_on
+
     print("  HUSHBELL is running.")
-    print(f"  Page:   http://localhost:{settings.port}   (on your phone, same Wi-Fi: {on_phone})")
+    print(f"  Page:   http://localhost:{settings.port}   (on your phone: {on_phone}, or press 'Open on your phone')")
     print(f"  Token:  {settings.access_token}")
     print(f"  Sort:   {'Claude (' + settings.model + ')' if has_key else 'safety rules only: no Claude key yet (run `hushbell init`)'}")
-    print(f"  Calls:  {'on' if settings.calls_enabled else 'off (set TWILIO_* and HUSHBELL_PARENT_PHONE)'}")
+    print(f"  Calls:  {'on' if settings.calls_enabled else 'off (set TWILIO_* and HUSHBELL_PARENT_PHONE)'}"
+          f"{' | voice: ElevenLabs' if settings.elevenlabs_api_key and settings.calls_enabled else ''}")
     if inbound_note:
         print(f"          {inbound_note}")
-    print(f"  Phone:  reading {'on' if reader else 'off'} | actions: {engine.phone.name}")
+    where = "PhoneUse cloud phone" if cloud else "USB Android"
+    print(f"  Phone:  {where} | reading {'on' if reader else 'off'} | actions: {engine.phone.name}")
+    print(f"  Ask:    Claude{' + Tavily web search' if settings.tavily_api_key else ''}"
+          f"   Traces: {'LangSmith, project ' + os.environ.get('LANGSMITH_PROJECT', 'hushbell') if tracing_on() else 'off'}")
     print(f"  Big screen for a demo: http://localhost:{settings.port}/present")
     print(f"  Data:   {settings.data_dir}")
     print()
@@ -156,14 +165,9 @@ def cmd_run(settings: Settings, args) -> int:
 
 def _lan_ip() -> str:
     """This computer's address on the local network, for opening the page from a phone."""
-    import socket
+    from hushbell.tunnel import lan_ip
 
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
-            probe.connect(("10.255.255.255", 1))  # no packet is sent; this only picks the outgoing interface
-            return probe.getsockname()[0]
-    except OSError:
-        return ""
+    return lan_ip()
 
 
 def _use_ngrok_if_running(settings: Settings) -> None:
@@ -242,7 +246,9 @@ def cmd_doctor(settings: Settings, live: bool) -> int:
             _warn(f"live Claude test failed: {exc}")
 
     print("\nPhone (reading notifications)")
-    if not shutil.which(settings.adb_path):
+    if settings.cloud_phone:
+        problems += _check_phoneuse(settings, live)
+    elif not shutil.which(settings.adb_path):
         problems += 1
         _warn(f"adb not found ('{settings.adb_path}')",
               "install Android platform-tools and add adb to PATH, or set HUSHBELL_ADB")
@@ -263,6 +269,10 @@ def cmd_doctor(settings: Settings, live: bool) -> int:
     print("\nPhone (acting after your OK)")
     if settings.phone_backend == "dry-run":
         _ok("dry run: Hushbell will only log what it would do")
+    elif settings.cloud_phone:
+        _ok("replies and forms run as tasks on the PhoneUse cloud phone")
+        if not settings.calls_enabled:
+            _warn("texts to your co-parent and 'time to leave' calls need Twilio in cloud-phone mode")
     else:
         from hushbell.phone import MobilerunPhone
         if MobilerunPhone(settings).available():
@@ -297,8 +307,73 @@ def cmd_doctor(settings: Settings, live: bool) -> int:
         _warn("calls are off; urgent messages will wait at the top of the page",
               "set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, HUSHBELL_PARENT_PHONE, HUSHBELL_PUBLIC_URL")
 
+    print("\nExtras (each is optional)")
+    problems += _check_extras(settings, live)
+
     print(f"\n{'All set.' if problems == 0 else f'{problems} thing(s) to fix.'}\n")
     return 0 if problems == 0 else 1
+
+
+def _check_phoneuse(settings: Settings, live: bool) -> int:
+    if not settings.phoneuse_api_key:
+        _warn("cloud-phone mode is on, but PHONEUSE_API_KEY is not set",
+              "make a key in the PhoneUse console (console.phoneuse.com) and run `hushbell init`")
+        return 1
+    _ok("PhoneUse key is set; the school apps live on a cloud phone"
+        + (f" ({settings.phoneuse_device})" if settings.phoneuse_device else ""))
+    if not live:
+        print("       run `hushbell doctor --live` to check the cloud phone is online")
+        return 0
+    from hushbell.phoneuse import PhoneUseClient, PhoneUseError, pick_device
+
+    try:
+        client = PhoneUseClient(settings.phoneuse_api_key, settings.phoneuse_url)
+        device = pick_device(client, settings.phoneuse_device)
+        image, _ = client.screenshot(device)
+        _ok(f"cloud phone {device} is online (screenshot {len(image) // 1024} KB)")
+        return 0
+    except (PhoneUseError, Exception) as exc:  # noqa: BLE001
+        _warn(f"PhoneUse check failed: {exc}")
+        return 1
+
+
+def _check_extras(settings: Settings, live: bool) -> int:
+    from hushbell.tracing import enabled as tracing_on
+    from hushbell.tunnel import detect_replit
+
+    problems = 0
+    if settings.elevenlabs_api_key:
+        _ok(f"ElevenLabs voice for calls (voice {settings.elevenlabs_voice}, {settings.elevenlabs_model})")
+        if live:
+            from hushbell.narrator import Narrator
+
+            if Narrator(settings).clip("This is Hushbell's voice check."):
+                _ok("ElevenLabs made a test clip")
+            else:
+                problems += 1
+                _warn("ElevenLabs didn't answer; calls will use Twilio's voice", "check ELEVENLABS_API_KEY")
+    else:
+        print("  [--] ElevenLabs voice: off (calls use Twilio's voice). Set ELEVENLABS_API_KEY to turn it on.")
+    if settings.tavily_api_key:
+        _ok("Tavily web search for 'Ask Hushbell'")
+        if live:
+            from hushbell.assistant import web_search
+
+            try:
+                web_search("San Francisco Unified School District calendar", settings.tavily_api_key)
+                _ok("Tavily answered a test search")
+            except Exception as exc:  # noqa: BLE001
+                problems += 1
+                _warn(f"Tavily test search failed: {exc}")
+    else:
+        print("  [--] Tavily web search: off. Set TAVILY_API_KEY so 'Ask Hushbell' can look things up.")
+    if tracing_on():
+        _ok(f"LangSmith traces, project '{os.environ.get('LANGSMITH_PROJECT', 'hushbell')}'")
+    else:
+        print("  [--] LangSmith traces: off. Set LANGSMITH_TRACING=true and LANGSMITH_API_KEY to see each step.")
+    if detect_replit():
+        _ok(f"running on Replit: {detect_replit()}")
+    return problems
 
 
 def _check_notifications(settings: Settings) -> int:

@@ -1,0 +1,22 @@
+{
+  "name": "Hushbell",
+  "short_name": "Hushbell",
+  "description": "Hushed all day. Rings when your kid needs you.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F4F7",
+  "theme_color": "#14203A",
+  "categories": ["education", "productivity", "lifestyle"],
+  "icons": [
+    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Big screen", "short_name": "Big screen", "url": "/present",
+     "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"}]}
+  ]
+}

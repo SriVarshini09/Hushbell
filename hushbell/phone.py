@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 class ActionResult:
     ok: bool
     detail: str
+    link: str = ""     # something for the parent to tap on the page (directions, calendar, call back)
 
 
 class PhoneBackend(Protocol):
@@ -275,7 +276,12 @@ def _last_line(text: str | None) -> str:
     return lines[-1][:240] if lines else ""
 
 
-def make_phone(settings: Settings) -> PhoneBackend:
+def make_phone(settings: Settings, messenger=None) -> PhoneBackend:
+    """The phone Hushbell acts on. `messenger` (Twilio) reaches real phones in cloud-phone mode."""
     if settings.phone_backend == "dry-run":
         return DryRunPhone(settings)
+    if settings.phone_backend == "phoneuse":
+        from hushbell.phoneuse import PhoneUsePhone
+
+        return PhoneUsePhone(settings, messenger=messenger)
     return MobilerunPhone(settings)

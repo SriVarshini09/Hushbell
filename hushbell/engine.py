@@ -29,7 +29,9 @@ from hushbell.models import (
 from hushbell.phone import PhoneBackend, UnsafeAction
 from hushbell.plan import PICKUP_LABELS, build_steps, parse_date, parse_time, spoken_list
 from hushbell.store import Store
+from hushbell.tracing import enabled as tracing_enabled
 from hushbell.triage.dedupe import WINDOW_SECONDS, find_duplicate
+from hushbell.tunnel import detect_replit
 from hushbell.triage.rules import SafetyRules
 from hushbell.voice import Voice
 
@@ -202,8 +204,8 @@ class Engine:
         if step is None:
             return
         ok, detail = self._do_step(item, step)
-        steps = [dict(s, enabled=True, status="done" if ok else "failed", detail=detail) if s["id"] == step_id else s
-                 for s in self.store.get_item(item_id).steps]
+        steps = [dict(s, enabled=True, status="done" if ok else "failed", detail=detail, link=step.get("link", ""))
+                 if s["id"] == step_id else s for s in self.store.get_item(item_id).steps]
         self.store.update_item(item_id, steps=steps)
         self.store.add_event("done" if ok else "failed", detail, item_id)
 
@@ -212,7 +214,10 @@ class Engine:
         if self.assistant is None:
             return "Asking needs a Claude key. Run `hushbell init` to add one."
         items = self.store.list_items(since=time.time() - 30 * 24 * 3600, limit=200)
-        return self.assistant.answer(question, items)
+        answer = self.assistant.answer(question, items)
+        for query in getattr(self.assistant, "last_searches", []):
+            self.store.add_event("web", f"Looked it up on the web (Tavily): {query}")
+        return answer
 
     def reset(self) -> None:
         """Start over: clear all messages and the log (used between demo rehearsals)."""
@@ -271,6 +276,12 @@ class Engine:
                 "digest_time": self.settings.digest_time,
                 "parent_name": self.settings.parent_name,
                 "partner_name": self.settings.partner_name,
+                # Which optional partner tools are switched on (shown on the big screen).
+                "cloud_phone": self.settings.cloud_phone,
+                "voice": "ElevenLabs" if self.settings.elevenlabs_api_key and self.settings.calls_enabled else "",
+                "web_search": bool(self.settings.tavily_api_key),
+                "tracing": tracing_enabled(),
+                "hosted": "Replit" if detect_replit() else "",
             },
             "now": time.time(),
             "digest": self.digest(since=day_start),
@@ -468,6 +479,8 @@ class Engine:
                     return True, what if "Dry run" not in result.detail else f"{what} (dry run)"
                 return False, f"{step['label']} didn't finish: {result.detail}"
             result = self.phone.perform_step(item, step)
+            if result.ok and getattr(result, "link", ""):
+                step["link"] = result.link      # shown on the page as a button to tap
             return result.ok, (result.detail if result.ok else f"{step['label']} didn't finish: {result.detail}")
         except UnsafeAction as exc:
             return False, f"Stopped: {exc}"

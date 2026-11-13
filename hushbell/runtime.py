@@ -25,24 +25,38 @@ def build_engine(settings: Settings) -> Engine:
     checkpointer = SqliteSaver(sqlite3.connect(str(settings.graph_db_path), check_same_thread=False))
     from hushbell.assistant import Assistant
 
+    voice = make_voice(settings)
     return Engine(
         settings=settings,
         store=store,
         classifier=ClaudeClassifier(settings),
-        phone=make_phone(settings),
-        voice=make_voice(settings),
+        phone=make_phone(settings, messenger=voice),
+        voice=voice,
         checkpointer=checkpointer,
         assistant=Assistant(settings),
     )
 
 
+def make_reader_source(engine: Engine, cloud: bool):
+    """Where notifications are read from: a USB Android (adb), or a PhoneUse cloud phone."""
+    settings = engine.settings
+    if not cloud:
+        return AdbNotificationSource(settings, store=engine.store)
+    from hushbell.phoneuse import PhoneUseClient, PhoneUseNotificationSource, ScreenReader
+
+    # Share the actions' client, so reading waits while a task runs on the cloud phone.
+    client = getattr(engine.phone, "client", None) or PhoneUseClient(settings.phoneuse_api_key, settings.phoneuse_url)
+    return PhoneUseNotificationSource(settings, client, ScreenReader(settings), store=engine.store)
+
+
 class PhoneReader(threading.Thread):
     """Polls the phone's notifications and feeds new school messages to the engine."""
 
-    def __init__(self, engine: Engine, source: AdbNotificationSource):
+    def __init__(self, engine: Engine, source: AdbNotificationSource, interval: float | None = None):
         super().__init__(name="hushbell-phone-reader", daemon=True)
         self.engine = engine
         self.source = source
+        self.interval = interval or engine.settings.poll_seconds
         self.stop_event = threading.Event()
         self._last_error = ""
 
@@ -62,7 +76,7 @@ class PhoneReader(threading.Thread):
                     log.warning("Can't read the phone: %s", error)
                     self.engine.store.add_event("phone", f"Can't read the phone: {error}")
                     self._last_error = error
-            self.stop_event.wait(self.engine.settings.poll_seconds)
+            self.stop_event.wait(self.interval)
 
 
 class DigestClock(threading.Thread):

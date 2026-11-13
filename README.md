@@ -6,8 +6,9 @@ Parents get dozens of school messages a day, spread across Remind, ClassDojo, Wh
 groups and email. Most of it can wait. Hidden in the pile is sometimes the one that can't:
 *"Maya has a fever, please pick her up by 1 pm."* With Do Not Disturb on, that one gets missed too.
 
-Hushbell is an open-source agent that watches the school apps on your own phone while it's on
-Do Not Disturb:
+Hushbell is an open-source agent that watches the school apps while your phone is on Do Not
+Disturb. The apps can stay on your own Android, or move to a PhoneUse cloud phone so your phone
+carries none of them:
 
 - **Noise waits.** Bake sales, newsletters and photos go into one evening digest.
 - **Things that need a yes become one card.** "Field trip form due today, trip next Friday" →
@@ -95,6 +96,50 @@ hushbell run --no-phone --dry-run --demo
 Open http://localhost:8000, sign in with the token it prints, and press the demo buttons:
 bake sale → later, field trip form → needs you (the WhatsApp repost joins it), fever → urgent.
 With `--dry-run`, Hushbell only logs what it would do on the phone.
+
+## Hushbell as an app on your phone
+
+Hushbell installs like an app (a PWA, a web app you add to your home screen): its own icon,
+full screen, and a friendly page when it can't be reached.
+1. On the laptop page, press **Open on your phone** and scan the code with the phone's camera. It
+   signs that phone in once, within 10 minutes, so you never type the token on a phone.
+2. On Android, press **Install app**. On iPhone, tap **Share**, then **Add to Home Screen**.
+
+Installing needs an https address: your ngrok address, or Replit (below). On plain Wi-Fi
+(`http://192.168…`) the page still works in the browser.
+
+## Two ways to run it
+
+| | **Your own Android** (default) | **In the cloud** (PhoneUse + Replit) |
+|---|---|---|
+| The school apps live on | your Android, plugged into a laptop | a [PhoneUse](https://www.phoneuse.com) cloud phone |
+| Hushbell runs on | your laptop | [Replit](https://replit.com), always on |
+| Reading new messages | `adb shell dumpsys notification` | a screenshot of the cloud phone's notification shade, read by Claude |
+| Replies and forms | Mobilerun, on your phone | a PhoneUse task on the cloud phone |
+| Alarm, co-parent text, directions, calendar | on your phone | a "time to leave" call, a text from Hushbell's number, and tap-to-open links |
+| Your own phone | an Android | any phone, iPhone too: it takes Hushbell's calls and opens the app |
+
+**Cloud set-up.** 1) In the [PhoneUse console](https://console.phoneuse.com), get a cloud phone,
+install Remind, ClassDojo and WhatsApp from its Apps page, and sign in to them yourself there
+(Hushbell never types a password). Make an API key. 2) On Replit, import this GitHub repository.
+In Secrets, add `ANTHROPIC_API_KEY`, `HUSHBELL_ACCESS_TOKEN`, `HUSHBELL_PHONE_BACKEND=phoneuse`,
+`PHONEUSE_API_KEY`, your family settings and the Twilio ones, then press Run. To keep it
+running, publish it as a **Reserved VM**. Hushbell uses the Replit address for calls and points
+your Twilio number at it on start-up. 3) Open the app on your phone and install it.
+`hushbell doctor --live` checks the cloud phone is online.
+
+## Built with the hackathon's partner tools
+
+| Tool | What it does in Hushbell |
+|---|---|
+| **PhoneUse** | The cloud phone that holds the school apps. Hushbell reads its notification shade, and replies and fills in forms there by handing PhoneUse a task in plain English ([`hushbell/phoneuse.py`](hushbell/phoneuse.py)). |
+| **LangChain** | LangGraph runs each message: sort, plan, wait for your OK (`interrupt()`), act. **LangSmith** traces every step, including Claude's decisions, the cloud phone's tasks and web lookups (`LANGSMITH_TRACING=true`). |
+| **Replit** | Hosts Hushbell with an always-on https address for the app and for Twilio ([`.replit`](.replit)). |
+| **Tavily** | "Ask Hushbell" searches the web when your messages don't hold the answer: a museum's hours on field trip day, a district closure (`TAVILY_API_KEY`). |
+| **ElevenLabs** | Hushbell's calls speak in a natural voice instead of a robot one; Twilio's voice is the fallback (`ELEVENLABS_API_KEY`). |
+| **Claude** | Sorts every message, reads the cloud phone's screen, plans replies, and answers "Ask Hushbell". |
+
+Each one switches on by itself when its key is set, and Hushbell works without any of them.
 
 ## Full setup
 

@@ -178,8 +178,14 @@ class AdbNotificationSource:
             raise RuntimeError((result.stderr or result.stdout or "adb failed").strip()[:300])
         return result.stdout
 
+    def read_records(self) -> list[RawNotification] | None:
+        """The notifications on the phone now (None: couldn't look this time, try again later)."""
+        return parse_dumpsys(self.read_raw())
+
     def poll(self) -> list[IncomingMessage]:
-        records = parse_dumpsys(self.read_raw())
+        records = self.read_records()
+        if records is None:
+            return []
         fresh: list[IncomingMessage] = []
         new_fingerprints: list[str] = []
         for record in records:

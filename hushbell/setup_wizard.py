@@ -22,6 +22,13 @@ QUESTIONS: list[tuple[str, str, bool]] = [
     ("TWILIO_ACCOUNT_SID", "Twilio Account SID (Enter to skip)", False),
     ("TWILIO_AUTH_TOKEN", "Twilio Auth Token (Enter to skip)", True),
     ("TWILIO_FROM_NUMBER", "Your Twilio phone number, like +14155550100 (Enter to skip)", False),
+    # Optional extras from the hackathon's partners. Each one turns on by itself when its key is set.
+    ("HUSHBELL_PHONE_BACKEND", "Where do the school apps live? Type 'phoneuse' for a PhoneUse cloud phone, "
+                               "or press Enter for an Android plugged into this laptop", False),
+    ("PHONEUSE_API_KEY", "PhoneUse API key, for the cloud phone (Enter to skip)", True),
+    ("ELEVENLABS_API_KEY", "ElevenLabs API key, for a natural voice on Hushbell's calls (Enter to skip)", True),
+    ("TAVILY_API_KEY", "Tavily API key, so 'Ask Hushbell' can search the web (Enter to skip)", True),
+    ("LANGSMITH_API_KEY", "LangSmith API key, to see a trace of every step (Enter to skip)", True),
 ]
 
 
@@ -112,6 +119,8 @@ def run_wizard(path: Path, ask=input, ask_secret=getpass.getpass, out=print) -> 
                 out(f"  saved ({len(reply)} characters)")
         elif secret and not rejected:
             out("  kept as it was" if existing else "  nothing entered, skipped")
+        if reply and key == "LANGSMITH_API_KEY":
+            set_env_values(path, {"LANGSMITH_TRACING": "true", "LANGSMITH_PROJECT": "hushbell"})
     out(f"\nSaved {saved} setting(s). Next: `hushbell run`, then open the page it prints. "
         "`hushbell doctor` checks the setup.\n")
     return 0

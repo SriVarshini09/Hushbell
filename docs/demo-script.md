@@ -7,7 +7,7 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 | What | Set-up |
 |---|---|
 | **Projector** | The laptop showing **http://localhost:8000/present** (the big-screen view), full screen with **F**. Optionally the parent's phone mirrored next to it with `scrcpy`. |
-| **Your phone** (the parent's) | Do Not Disturb **on**. Hushbell's Twilio number saved as "Hushbell" and starred. Hushbell page open on it. |
+| **Your phone** (the parent's) | Do Not Disturb **on**. Hushbell's Twilio number saved as "Hushbell" and starred. Hushbell **installed as an app** (laptop page → Open on your phone → scan → Install). |
 | **Android with the school apps** | Plugged into the laptop, screen awake, Remind signed in as a parent. (If your own phone is Android, it's the same phone.) |
 | **Teacher phone** | A teammate's phone with the Remind teacher account. Hand it to **judge 1**. |
 | **Judge 2's own phone** | They will call Hushbell's number. Write the number on a card. |
@@ -34,7 +34,24 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 | 1:40 | Optional: call Hushbell from your own phone and ask *"What do I need to do this week?"* | Hushbell reads out the week |
 | 1:50 | "Three messages and a phone call. My phone rang once, I pressed one key and tapped once, and I never opened a school app. Hushbell is open source and runs on my own phone and laptop." | The four numbers: school messages → rang through → things done on the phone → taps by Eli |
 
+## Cloud version (if you set up PhoneUse)
+
+Same script, with the school apps on a PhoneUse cloud phone instead of an Android on the table.
+Show the cloud phone in the PhoneUse console next to the big screen: the room sees Hushbell pull
+the notification shade down, and later sees PhoneUse's agent open Remind and send the reply. The
+big screen's header lists the partner tools that are on (PhoneUse, ElevenLabs, Tavily,
+LangSmith, Replit). Line to say: "My phone has no school apps at all. They live on a cloud phone
+that Hushbell watches for me."
+
+For the "Ask" moment, try one that needs the web: *"What time does the science museum open on
+the field trip day?"* The answer says it looked it up with Tavily.
+
 ## Likely questions
+
+- **"Which partner tools did you use?"** PhoneUse (the cloud phone with the school apps), LangGraph
+  and LangSmith (each message's flow and its trace), Replit (always-on hosting for the app and the
+  calls), Tavily (Ask looks things up), ElevenLabs (the voice on the calls), and Claude for sorting
+  and reading the screen.
 
 - **"Isn't this Fambot?"** Fambot reads accounts it can connect to and sends a checklist. Hushbell
   reads what lands on the phone, including apps with no integration, answers calls, acts inside the

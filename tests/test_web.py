@@ -3,8 +3,8 @@ from fastapi.testclient import TestClient
 
 from hushbell.web.app import create_app
 
-FEVER = {"app": "Remind", "sender": "Ms. Rivera · Room 12",
-         "text": "Maya has a fever (101°F). Please pick her up by 1pm."}
+FEVER = {"app": "Remind", "sender": "Ms. Rivera Â· Room 12",
+         "text": "Maya has a fever (101Â°F). Please pick her up by 1pm."}
 AUTH = {"Authorization": "Bearer test-token"}
 
 
@@ -125,7 +125,7 @@ def test_ask_hushbell(make_engine):
     engine.assistant = FakeAssistant()
     client.post("/api/ingest", json={"app": "Remind", "sender": "t", "text": "Field trip form due TODAY"}, headers=AUTH)
     r = client.post("/api/ask", json={"question": "What's due?"}, headers=AUTH)
-    assert r.json() == {"answer": "Sign the field trip form today."}
+    assert r.json() == {"answer": "Sign the field trip form today.", "searches": []}
     assert engine.assistant.seen == ("What's due?", ["Field trip form due TODAY"])
     assert client.post("/api/ask", json={"question": ""}, headers=AUTH).status_code == 422
     assert TestClient(create_app(engine)).post("/api/ask", json={"question": "x"}).status_code == 401

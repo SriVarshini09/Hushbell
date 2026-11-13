@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#14203A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Hushbell">
 <title>Hushbell</title>
 <style>
 :root{
@@ -99,11 +105,26 @@ button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .ask input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
 .answer{margin-top:10px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--bell);border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px}
 .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.answer .web{margin-top:8px;font-size:12px;color:var(--muted);white-space:normal}
+.step .open{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--needs);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
 .demo{display:flex;gap:8px;flex-wrap:wrap}
 #demoBox{margin-top:26px;border:1px dashed var(--line);border-radius:14px;padding:4px 14px 14px}
 #demoBox h2{margin-top:10px}
 #demoBox p{margin:0 0 10px;font-size:12.5px;color:var(--muted)}
 footer{margin-top:28px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12.5px;gap:10px;flex-wrap:wrap}
+.foot-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.foot-btns form{margin:0}
+dialog{border:1px solid var(--line);border-radius:18px;padding:20px 22px;background:var(--card);color:var(--ink);max-width:340px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(10,15,30,.55)}
+dialog h3{margin:0 0 6px;font-size:18px}
+dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+.qr{display:grid;place-items:center;background:#fff;border-radius:12px;padding:10px;margin-bottom:10px;min-height:120px}
+.qr svg{width:230px;height:230px;max-width:100%}
+.small-note{font-size:12.5px}
+.install-tip{display:flex;gap:10px;align-items:center;margin:14px 0 0;padding:10px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:13px}
+.install-tip img{width:34px;height:34px;border-radius:9px;flex:none}
+.install-tip span{flex:1}
+.install-tip[hidden]{display:none}
 @media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
 </style>
@@ -114,6 +135,12 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     <div class="brand"><span class="bell"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>HUSHBELL</span><span class="tag">Hushed all day. Rings when your kid needs you.</span></div>
     <div class="setup" id="setup"></div>
   </header>
+
+  <div class="install-tip" id="installTip" hidden>
+    <img src="/icons/icon-192.png" alt="">
+    <span id="installTipText">Add Hushbell to your home screen to use it like an app.</span>
+    <button type="button" class="small" id="installTipClose" aria-label="Hide this tip">✕</button>
+  </div>
 
   <div class="stats" id="stats">
     <div class="stat"><b id="sMsgs">0</b><span>school messages today</span></div>
@@ -167,11 +194,23 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   </section>
 
   <footer>
-    <span>Runs on your own laptop and phone. Nothing is sent, signed or paid without your OK.
+    <span>Nothing is sent, signed or paid without your OK.
       <a href="/present" style="color:inherit">Presenter view</a></span>
-    <form method="post" action="/logout"><button type="submit">Sign out</button></form>
+    <span class="foot-btns">
+      <button type="button" class="small" id="pairBtn">Open on your phone</button>
+      <button type="button" class="small primary" id="installBtn" hidden>Install app</button>
+      <form method="post" action="/logout"><button type="submit" class="small">Sign out</button></form>
+    </span>
   </footer>
 </div>
+
+<dialog id="pairDialog" aria-labelledby="pairTitle">
+  <h3 id="pairTitle">Open Hushbell on your phone</h3>
+  <p>Scan this with your phone's camera. It signs that phone in, once, within 10 minutes.</p>
+  <div id="pairCode" class="qr"></div>
+  <p id="pairNote" class="small-note"></p>
+  <form method="dialog"><button class="primary">Done</button></form>
+</dialog>
 
 <script>
 (() => {
@@ -209,10 +248,17 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     return `<div class="plan"><div class="plan-title">Hushbell will, with your OK</div>${rows}</div>`;
   }
 
+  const LINK_TEXT = {directions: "Open directions", add_calendar: "Add to calendar", call_back: "Call them back"};
+  const safeLink = url => /^(https:\/\/|tel:\+?[0-9]+$)/.test(String(url || "")) ? String(url) : "";
+
   function planDone(it) {
     if (!it.steps || !it.steps.length) return "";
-    return `<div class="plan">${it.steps.map(st => `<div class="step"><span class="mark ${esc(st.status)}">${MARK[st.status] || "·"}</span>
-      <span style="flex:1;min-width:0">${esc(st.label)}${st.detail ? `<span class="detail">${esc(st.detail)}</span>` : ""}</span></div>`).join("")}</div>`;
+    return `<div class="plan">${it.steps.map(st => {
+      const link = st.status === "done" ? safeLink(st.link) : "";
+      const open = link ? `<a class="open" href="${esc(link)}" target="_blank" rel="noopener">${esc(LINK_TEXT[st.type] || "Open")}</a>` : "";
+      return `<div class="step"><span class="mark ${esc(st.status)}">${MARK[st.status] || "·"}</span>
+      <span style="flex:1;min-width:0">${esc(st.label)}${st.detail ? `<span class="detail">${esc(st.detail)}</span>` : ""}${open}</span></div>`;
+    }).join("")}</div>`;
   }
 
   function approveLabel(it) {
@@ -277,7 +323,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     today = s.today;
     const setup = s.setup;
     const phone = !setup.reading_phone ? ["off", "Phone reading off"]
-      : setup.phone_health === "ok" ? ["on", "Phone connected"]
+      : setup.phone_health === "ok" ? ["on", setup.cloud_phone ? "Cloud phone connected" : "Phone connected"]
       : setup.phone_health === "starting" ? ["off", "Connecting to phone…"]
       : ["bad", "Phone not connected"];
     $("setup").innerHTML = [
@@ -362,7 +408,9 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     $("askBtn").disabled = true;
     $("answer").innerHTML = '<div class="answer">Thinking…</div>';
     const data = await post("/api/ask", null, {question});
-    $("answer").innerHTML = `<div class="answer">${esc(data.answer || notice || "Sorry, no answer.")}</div>`;
+    const web = (data.searches || []).length
+      ? `<div class="web">Looked up on the web with Tavily: ${data.searches.map(q => `“${esc(q)}”`).join(", ")}</div>` : "";
+    $("answer").innerHTML = `<div class="answer">${esc(data.answer || notice || "Sorry, no answer.")}${web}</div>`;
     $("askBtn").disabled = false;
   }
 
@@ -404,6 +452,56 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   });
 
   $("askForm").addEventListener("submit", e => { e.preventDefault(); ask($("askInput").value); });
+
+  // ---- Hushbell as an app on the phone ----------------------------------
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const isPhone = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad/i.test(navigator.userAgent);
+  const tipOff = () => localStorage.getItem("hb-tip-off") === "1";
+  let installEvent = null;
+  function showTip(html) {
+    if (standalone || tipOff()) return;
+    $("installTipText").innerHTML = html;
+    $("installTip").hidden = false;
+  }
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    installEvent = e;
+    $("installBtn").hidden = false;
+    if (isPhone) showTip('Install Hushbell as an app: its own icon, full screen. <button type="button" class="small primary" id="installNow">Install</button>');
+  });
+  async function install() {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice;
+    installEvent = null;
+    $("installBtn").hidden = true;
+    $("installTip").hidden = true;
+  }
+  $("installBtn").addEventListener("click", install);
+  document.addEventListener("click", e => { if (e.target.id === "installNow") install(); });
+  if (isIOS) showTip("To install Hushbell as an app: tap <b>Share</b>, then <b>Add to Home Screen</b>.");
+  if (new URLSearchParams(location.search).has("installed")) {
+    notice = "This phone is signed in to Hushbell."; noticeOk = true;
+    history.replaceState(null, "", "/");
+  }
+  $("installTipClose").addEventListener("click", () => { $("installTip").hidden = true; localStorage.setItem("hb-tip-off", "1"); });
+  if (standalone) $("pairBtn").hidden = true;
+  $("pairBtn").addEventListener("click", async () => {
+    $("pairCode").textContent = "Making a code…";
+    $("pairNote").textContent = "";
+    $("pairDialog").showModal();
+    try {
+      const r = await fetch("/api/pair", {method: "POST", credentials: "same-origin"});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "failed");
+      $("pairCode").innerHTML = d.svg;       // an SVG drawn by Hushbell itself, not message content
+      const base = d.url.replace(/\/pair\/.*$/, "");
+      $("pairNote").textContent = d.secure ? `Opens ${base}`
+        : `Your phone must be on the same Wi-Fi (${base}). For the full app with its own icon, use the https address from ngrok or Replit.`;
+    } catch (e) { $("pairCode").textContent = "Couldn't make a code. Is Hushbell still running?"; }
+  });
 
   refresh();
   setInterval(refresh, 2000);
