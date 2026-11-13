@@ -15,12 +15,12 @@
 :root{
   /* School-bus yellow bell on cool paper; red/blue/grey only for urgent / needs you / later. */
   --paper:#F2F4F7;--ink:#14203A;--muted:#5C6679;--line:#D3DAE4;--card:#FFFFFF;--soft:#EEF1F6;
-  --bell:#F4B400;--urgent:#D2433F;--needs:#2E6BD6;--later:#7C8597;--ok:#1E9A5E;
+  --bell:#F4B400;--urgent:#C4302C;--needs:#2E6BD6;--later:#7C8597;--ok:#17804C;
   color-scheme:light
 }
 @media (prefers-color-scheme:dark){:root{
   --paper:#0F1522;--ink:#E8ECF4;--muted:#9AA5BA;--line:#2A3448;--card:#171F30;--soft:#1F2840;
-  --urgent:#F07470;--needs:#76A3F2;--later:#9AA3B5;--ok:#4CC28A;--on-needs:#0F1522;color-scheme:dark}}
+  --urgent:#F07470;--needs:#76A3F2;--later:#9AA3B5;--ok:#4CC28A;--on-needs:#0F1522;--on-urgent:#0F1522;--on-ok:#0F1522;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
@@ -38,6 +38,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:10px;fl
 button.mini{font-size:12px;padding:3px 10px;border-radius:999px}
 .notice{margin:0 0 10px;font-size:13px;color:var(--urgent)}
 .notice.ok{color:var(--ok)}
+.notice[hidden]{display:none}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 6px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 12px}
 .stat b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -57,10 +58,10 @@ h2 .count{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;bord
 @keyframes shake{0%,50%,100%{transform:rotate(0)}10%,30%{transform:rotate(-14deg)}20%,40%{transform:rotate(14deg)}}
 .meta{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pill{font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:2px 7px;background:var(--soft)}
-.pill.urgent{background:var(--urgent);color:#fff}
+.pill.urgent{background:var(--urgent);color:var(--on-urgent,#fff)}
 .pill.needs_you{background:var(--needs);color:var(--on-needs,#fff)}
 .pill.calling{background:var(--bell);color:#14203A}
-.pill.done{background:var(--ok);color:#fff}
+.pill.done{background:var(--ok);color:var(--on-ok,#fff)}
 .summary{font-weight:650;margin:6px 0 4px;font-size:15.5px}
 .reason{font-size:13.5px;color:var(--muted)}
 .reason b{font-weight:600;color:var(--ink)}
@@ -100,13 +101,14 @@ button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .day .date span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
 .day .what{flex:1;min-width:0;font-size:14px}
 .day .what small{display:block;color:var(--muted);font-size:12.5px}
+.day .open{margin-top:0;white-space:nowrap}
 .oncal{font-size:12.5px;color:var(--ok);font-weight:700;white-space:nowrap}
 .ask{display:flex;gap:8px}
 .ask input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
 .answer{margin-top:10px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--bell);border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px}
 .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .answer .web{margin-top:8px;font-size:12px;color:var(--muted);white-space:normal}
-.step .open{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--needs);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
+.step .open,.day .open{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:700;color:var(--needs);text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
 .demo{display:flex;gap:8px;flex-wrap:wrap}
 #demoBox{margin-top:26px;border:1px dashed var(--line);border-radius:14px;padding:4px 14px 14px}
 #demoBox h2{margin-top:10px}
@@ -127,6 +129,9 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
 .install-tip[hidden]{display:none}
 @media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
+/* Fingers need bigger targets than a mouse pointer. */
+@media (pointer:coarse){button.small,button.mini{min-height:40px;padding-left:12px;padding-right:12px}.step{padding:8px 0}
+  .step .open,.day .open{padding:9px 12px}}
 </style>
 </head>
 <body>
@@ -150,6 +155,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
   </div>
 
   <h2>Needs you<span class="count" id="needsCount" hidden></span></h2>
+  <p class="notice" id="lost" role="status" hidden>Can't reach Hushbell right now. Trying again every few seconds…</p>
   <div id="notice"></div>
   <div id="needs"></div>
 
@@ -159,7 +165,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
   <h2>Ask Hushbell</h2>
   <form class="ask" id="askForm">
     <label for="askInput" hidden>Question about your school messages</label>
-    <input id="askInput" maxlength="300" autocomplete="off" placeholder="What do I need to do this week?">
+    <input id="askInput" maxlength="300" autocomplete="off" aria-label="Question about your school messages" placeholder="What do I need to do this week?">
     <button type="submit" class="primary" id="askBtn">Ask</button>
   </form>
   <div class="suggest">
@@ -167,7 +173,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     <button type="button" class="small" data-ask="Is anything due tomorrow?">Due tomorrow</button>
     <button type="button" class="small" data-ask="What should I pack or bring for school this week?">What to bring</button>
   </div>
-  <div id="answer"></div>
+  <div id="answer" aria-live="polite"></div>
 
   <h2>Handled and in progress</h2>
   <div id="handled"></div>
@@ -189,6 +195,8 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
       <button type="button" data-demo="3">Chess club question</button>
       <button type="button" data-demo="4">Picture day</button>
       <button type="button" data-demo="5">Fever</button>
+      <button type="button" data-sim="call" class="sim-only" hidden>Nurse calls Hushbell (simulated)</button>
+      <button type="button" data-sim="press/1" class="sim-only" hidden>Press 1 on the call (simulated)</button>
       <button type="button" data-reset="1">Start over</button>
     </div>
   </section>
@@ -221,12 +229,18 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
   const drafts = {};          // edited replies, by item id
   const unticked = {};        // item id -> Set of step ids the parent unticked
   let notice = "", noticeOk = false, today = "";
+  let itemsById = {}, openKey = "", asking = false, noticeTimer = null;
+  const sent = new Set();     // answers that reached Hushbell; their cards are about to leave
+
+  function showNotice() {
+    $("notice").innerHTML = notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "";
+  }
 
   const MARK = {done: "✓", failed: "✗", skipped: "–"};
 
   function meta(it) {
     const from = it.sources && it.sources.length > 1 ? `${esc(it.sender)} · ${it.sources.map(esc).join(" + ")}` : `${esc(it.sender)} · ${esc(it.app)}`;
-    return `${from} · ${time(it.created_at)}${it.due ? " · due " + esc(it.due) : ""}`;
+    return `${it.app === "Phone call" ? from.replace(/\+1(\d{3})(\d{3})(\d{4})/, "($1) $2-$3") : from} · ${time(it.created_at)}${it.due ? " · due " + esc(it.due) : ""}`;
   }
 
   function planForOpen(it) {
@@ -274,13 +288,15 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
 
   const PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>';
   const MOON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
-  let showAllEvents = false;
+  let showAllEvents = false, simulated = false, misses = 0, cloud = false;
 
   function needsCard(it) {
     const calling = it.status === "calling";
     const why = it.rule_hit ? `<b>Safety words:</b> ${esc(it.rule_hit)} (caught before any AI)` : `<b>Why:</b> ${esc(it.reason)}`;
     return `<article class="card ${it.category === "urgent" ? "urgent" : ""}">
-      ${calling ? `<div class="ringing">${PHONE}Calling you now, through Do Not Disturb. Press 1 on the call, or tap below.</div>` : ""}
+      ${calling ? `<div class="ringing">${PHONE}${simulated
+        ? "Rehearsal: a simulated call, so no phone is ringing. Use “Press 1 on the call” in the demo box, or tap below."
+        : "Calling you now, through Do Not Disturb. Press 1 on the call, or tap below."}</div>` : ""}
       <div class="meta"><span class="pill ${esc(it.category)}">${it.category === "urgent" ? "URGENT" : "NEEDS YOU"}</span>
         <span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
@@ -300,7 +316,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
   function handledRow(it) {
     const cls = it.status === "done" ? "done" : it.category === "urgent" ? "urgent" : it.category === "later" ? "later" : "";
     return `<article class="card ${cls}">
-      <div class="meta"><span class="pill ${it.status === "done" ? "done" : ""}">${esc(STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
+      <div class="meta"><span class="pill ${it.status === "done" ? "done" : ""}">${esc(it.status === "acting" && cloud ? "Working on the cloud phone…" : STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
       ${planDone(it)}
       ${it.status === "failed" ? `<div class="reason" style="margin-top:8px">${esc(it.result)}</div><div class="btns"><button type="button" data-retry="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>Try again</button></div>` : ""}
@@ -319,6 +335,10 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     return new Date(2000, 0, 1, h, m).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
   }
 
+  // "18:00" as "6 PM", the same way the big screen and the activity log say it.
+  const digestAt = hhmm => { const [h, m] = (hhmm || "18:00").split(":").map(Number);
+    return new Date(2000, 0, 1, h, m).toLocaleTimeString([], {hour: "numeric", minute: m ? "2-digit" : undefined}); };
+
   function render(s) {
     today = s.today;
     const setup = s.setup;
@@ -327,7 +347,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
       : setup.phone_health === "starting" ? ["off", "Connecting to phone…"]
       : ["bad", "Phone not connected"];
     $("setup").innerHTML = [
-      `<span class="chip ${setup.calls ? "on" : "off"}">Calls ${setup.calls ? "on" : "off"}</span>`,
+      `<span class="chip ${setup.calls ? "on" : "off"}">Calls ${setup.calls ? "on" : setup.calls_simulated ? "simulated" : "off"}</span>`,
       `<span class="chip ${phone[0]}">${phone[1]}</span>`,
       `<span class="chip ${setup.phone_actions === "mobilerun" ? "on" : "off"}">Actions: ${esc(setup.phone_actions)}</span>`,
       setup.calls ? '<button type="button" class="mini" data-testcall="1">Test call</button>' : "",
@@ -340,21 +360,36 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     $("needsCount").hidden = !s.counts.needs_you;
     $("needsCount").textContent = s.counts.needs_you;
     $("demoBox").hidden = !setup.demo;
-    $("laterTitle").textContent = `For tonight's digest (${setup.digest_time})`;
-    $("notice").innerHTML = notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "";
+    simulated = !!setup.calls_simulated;
+    cloud = !!setup.cloud_phone;
+    document.querySelectorAll(".sim-only").forEach(b => { b.hidden = !simulated; });
+    $("laterTitle").textContent = `For tonight's digest (${digestAt(setup.digest_time)})`;
+    showNotice();
+    itemsById = Object.fromEntries(s.items.map(i => [i.id, i]));
 
     const open = s.items.filter(i => i.status === "calling" || i.status === "waiting")
       .sort((a, b) => (a.category === "urgent" ? 0 : 1) - (b.category === "urgent" ? 0 : 1) || b.created_at - a.created_at);
+    // An answer that went through stays "busy" until its card has left, so a second tap can't send it twice.
+    sent.forEach(id => { if (!open.some(i => i.id === id)) { busy.delete(id); sent.delete(id); } });
+    // While a reply is being typed, leave the cards alone unless one arrived, left or changed state.
+    // Then redraw, and put the cursor back where it was.
     const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#needs textarea");
-    if (!editing) {
+    const key = open.map(i => `${i.id}:${i.status}:${busy.has(i.id) ? 1 : 0}`).join("|");
+    if (!editing || key !== openKey) {
+      const caret = editing ? [editing.dataset.replyFor, editing.selectionStart, editing.selectionEnd, editing.scrollTop] : null;
       $("needs").innerHTML = open.length ? open.map(needsCard).join("")
         : `<div class="empty quiet"><span class="moon">${MOON}</span><span><b>All quiet.</b>Nothing needs you right now. Your phone can stay on Do Not Disturb.</span></div>`;
+      const box = caret && document.querySelector(`[data-reply-for="${CSS.escape(caret[0])}"]`);
+      if (box) { box.focus({preventScroll: true}); box.setSelectionRange(caret[1], caret[2]); box.scrollTop = caret[3]; }
     }
+    openKey = key;
 
     $("coming").innerHTML = s.coming_up.length ? `<div class="list">${s.coming_up.map(c => `
       <div class="day">${dayBox(c.date)}
         <div class="what">${esc(c.title)}<small>${c.time ? esc(clock(c.time)) + " · " : ""}${c.child ? esc(c.child) : ""}</small></div>
-        ${c.on_calendar ? '<span class="oncal">On calendar ✓</span>'
+        ${c.on_calendar ? (safeLink(c.link)
+            ? `<a class="open" href="${esc(safeLink(c.link))}" target="_blank" rel="noopener">Add to calendar</a>`
+            : '<span class="oncal">On calendar ✓</span>')
           : c.can_add ? `<button type="button" class="small" data-step-run="${esc(c.item_id)}" data-step-id="${esc(c.calendar_step)}">Add to calendar</button>` : ""}
       </div>`).join("")}</div>`
       : '<div class="empty">No dates yet. School events and deadlines will show up here.</div>';
@@ -373,31 +408,46 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
       : '<div class="row">No activity yet.</div>';
     $("moreEvents").hidden = s.events.length <= 8;
     $("moreEvents").textContent = showAllEvents ? "Show less" : `Show all ${s.events.length}`;
-    $("askBtn").disabled = !s.can_ask;
+    $("askBtn").disabled = !s.can_ask || asking;
   }
 
   async function refresh() {
     try {
       const r = await fetch("/api/state", {credentials: "same-origin"});
       if (r.status === 401) { location.reload(); return; }
+      if (!r.ok) throw new Error("HTTP " + r.status);
       render(await r.json());
-    } catch (e) { /* offline for a moment; try again on the next tick */ }
+      misses = 0;
+    } catch (e) { misses++; }    // offline for a moment; try again on the next tick
+    $("lost").hidden = misses < 3;   // say so once it has been about 6 seconds, so old news isn't taken for current
   }
 
-  async function post(url, id, body, okText) {
+  // `answer` marks an approve or "I'll handle it": once it goes through, the card stays locked until it leaves.
+  async function post(url, id, body, okText, answer) {
     if (id) busy.add(id);
     notice = ""; noticeOk = false;
-    let data = {};
+    clearTimeout(noticeTimer);
+    let data = {}, ok = false;
     try {
       const options = {method: "POST", credentials: "same-origin"};
       if (body) { options.headers = {"Content-Type": "application/json"}; options.body = JSON.stringify(body); }
       const r = await fetch(url, options);
       data = await r.json().catch(() => ({}));
-      if (!r.ok) notice = data.detail || "That didn't work. Try again.";
-      else if (okText) { notice = okText; noticeOk = true; }
+      ok = r.ok;
+      if (r.status === 401) { location.reload(); return data; }
+      if (!r.ok) notice = (typeof data.detail === "string" && data.detail) || "That didn't work. Try again.";
+      else {
+        const text = typeof okText === "function" ? okText(data) : okText;
+        if (text) {
+          notice = text; noticeOk = true;
+          // A "done" note shouldn't sit on the page for the rest of the day.
+          noticeTimer = setTimeout(() => { if (notice === text) { notice = ""; showNotice(); } }, 6000);
+        }
+      }
     } catch (e) { notice = "Couldn't reach Hushbell. Check that it is still running."; }
-    if (id) busy.delete(id);
-    refresh();
+    if (id && ok && answer) sent.add(id); else if (id) busy.delete(id);
+    data.ok = ok;
+    await refresh();
     return data;
   }
 
@@ -405,12 +455,16 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     question = question.trim();
     if (!question) return;
     $("askInput").value = question;
+    if (asking) return;
+    asking = true;
     $("askBtn").disabled = true;
     $("answer").innerHTML = '<div class="answer">Thinking…</div>';
     const data = await post("/api/ask", null, {question});
+    asking = false;
     const web = (data.searches || []).length
       ? `<div class="web">Looked up on the web with Tavily: ${data.searches.map(q => `“${esc(q)}”`).join(", ")}</div>` : "";
     $("answer").innerHTML = `<div class="answer">${esc(data.answer || notice || "Sorry, no answer.")}${web}</div>`;
+    if (!data.answer && notice) { notice = ""; showNotice(); }   // the reason is already in the answer box
     $("askBtn").disabled = false;
   }
 
@@ -418,19 +472,27 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     const t = e.target.closest("button");
     if (!t) return;
     if (t.id === "moreEvents") { showAllEvents = !showAllEvents; refresh(); return; }
+    const forItem = t.dataset.approve || t.dataset.skip || t.dataset.retry || t.dataset.stepRun;
+    if (forItem && busy.has(forItem)) return;      // a second tap while the first is on its way
+    const lock = () => t.closest(".btns").querySelectorAll("button").forEach(b => { b.disabled = true; });
     if (t.dataset.approve) {
       const id = t.dataset.approve;
       const box = document.querySelector(`[data-reply-for="${CSS.escape(id)}"]`);
       const skip = [...(unticked[id] || [])];
-      post(`/api/items/${encodeURIComponent(id)}/approve`, id, {reply_text: box ? box.value : null, skip});
-      delete drafts[id]; delete unticked[id];
+      lock();
+      // The edited reply and unticked steps are kept if the answer didn't get through.
+      post(`/api/items/${encodeURIComponent(id)}/approve`, id, {reply_text: box ? box.value : null, skip}, null, true)
+        .then(d => { if (d.ok) { delete drafts[id]; delete unticked[id]; } });
     }
     else if (t.dataset.retry) post(`/api/items/${encodeURIComponent(t.dataset.retry)}/retry`, t.dataset.retry);
     else if (t.dataset.stepRun) post(`/api/items/${encodeURIComponent(t.dataset.stepRun)}/steps/${encodeURIComponent(t.dataset.stepId)}`, t.dataset.stepRun, null, "Adding it to your calendar…");
     else if (t.dataset.reset) { $("answer").innerHTML = ""; post("/api/demo/reset", null, null, "Cleared. Ready for a fresh run."); }
     else if (t.dataset.testcall) post("/api/test-call", null, null, "Calling your phone now. It should ring even on Do Not Disturb.");
-    else if (t.dataset.skip) post(`/api/items/${encodeURIComponent(t.dataset.skip)}/skip`, t.dataset.skip);
-    else if (t.dataset.demo) post(`/api/demo/${t.dataset.demo}`);
+    else if (t.dataset.skip) { lock(); post(`/api/items/${encodeURIComponent(t.dataset.skip)}/skip`, t.dataset.skip, null, null, true); }
+    else if (t.dataset.sim) post(`/api/demo/${t.dataset.sim}`, null, null,
+      t.dataset.sim === "call" ? "Simulated: the school nurse is calling Hushbell. No phone will ring." : "");
+    else if (t.dataset.demo) post(`/api/demo/${t.dataset.demo}`, null, null,
+      d => d.new === false ? "Same news as an earlier message, so Hushbell joined them. Start over to send it fresh." : "");
     else if (t.dataset.ask) ask(t.dataset.ask);
   });
 
@@ -441,10 +503,7 @@ dialog p{margin:0 0 12px;color:var(--muted);font-size:13.5px}
     unticked[id] = unticked[id] || new Set();
     if (box.checked) unticked[id].delete(box.dataset.step); else unticked[id].add(box.dataset.step);
     const btn = document.querySelector(`[data-approve="${CSS.escape(id)}"]`);
-    if (btn) {
-      const n = box.closest(".plan").querySelectorAll("input[type=checkbox]:checked").length;
-      btn.textContent = n === 0 ? "Mark seen" : n === 1 ? "Do it" : `Do these ${n}`;
-    }
+    if (btn && itemsById[id]) btn.textContent = approveLabel(itemsById[id]);
   });
 
   document.addEventListener("input", e => {

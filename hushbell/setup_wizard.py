@@ -96,6 +96,7 @@ def read_env_values(path: Path) -> dict[str, str]:
 
 def run_wizard(path: Path, ask=input, ask_secret=getpass.getpass, out=print) -> int:
     example = Path(__file__).resolve().parent.parent / ".env.example"
+    path.parent.mkdir(parents=True, exist_ok=True)      # `--file new-folder/.env` just works
     if not path.exists() and example.exists():
         path.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
     current = read_env_values(path)

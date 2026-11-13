@@ -30,7 +30,8 @@ def build_engine(settings: Settings) -> Engine:
         settings=settings,
         store=store,
         classifier=ClaudeClassifier(settings),
-        phone=make_phone(settings, messenger=voice),
+        # A simulated (rehearsal) voice can't text or call anyone, so it is never the messenger.
+        phone=make_phone(settings, messenger=None if getattr(voice, "simulated", False) else voice),
         voice=voice,
         checkpointer=checkpointer,
         assistant=Assistant(settings),

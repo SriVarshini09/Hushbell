@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -84,6 +85,9 @@ FAVICON = (
 
 ICONS = {"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png"}
 PAIR_SECONDS = 600
+PENDING_CALL_SECONDS = 20.0      # a caller's message waits this long for "press 1" before it is passed on
+DEMO_CALLER = "+14155550134"     # the rehearsal's school nurse (a made-up 555 number)
+DEMO_CALL_SECONDS = 4.0          # how long the rehearsal's "Hushbell answered a call" banner shows first
 MAX_LOGIN_FAILURES = 8
 LOGIN_WINDOW_SECONDS = 600
 
@@ -231,7 +235,8 @@ def create_app(engine: Engine) -> FastAPI:
         code = secrets.token_urlsafe(18)
         pairings[code] = now + PAIR_SECONDS
         url = f"{phone_address(request)}/pair/{code}"
-        svg = segno.make(url, error="m").svg_inline(scale=5, dark="#14203A", light="#FFFFFF", border=2)
+        svg = segno.make(url, error="m").svg_inline(scale=5, dark="#14203A", light="#FFFFFF", border=2,
+                                                 omitsize=True)   # a viewBox, so the page can size it
         return {"url": url, "svg": svg, "expires_in": PAIR_SECONDS,
                 "secure": url.startswith("https://")}
 
@@ -324,6 +329,44 @@ def create_app(engine: Engine) -> FastAPI:
         engine.reset()
         return {"ok": True}
 
+    # ---- rehearsal: the call moments without Twilio ----------------------------
+    # Only with --demo --simulate-calls and no Twilio (engine.simulated_calls). Nothing rings; the
+    # screens say "simulated".
+
+    def require_rehearsal(request: Request) -> None:
+        require(request)
+        if not settings.demo_mode or not engine.simulated_calls:
+            raise HTTPException(status_code=404, detail="Simulated calls need `hushbell run --demo --simulate-calls` and no Twilio.")
+
+    @app.post("/api/demo/call")
+    def demo_call(request: Request):
+        """Rehearse "the school nurse calls Hushbell": the banner first, then what she said."""
+        require_rehearsal(request)
+        child = settings.children[0] if settings.children else "Maya"
+        school = f" at {settings.schools[0]}" if settings.schools else ""
+        said = f"Hi, this is the school nurse{school}. {child} has a fever. Please pick {child} up as soon as you can."
+        engine.store.add_event("incoming call",
+                               f"Hushbell answered a call from {pretty_phone(DEMO_CALLER)} (simulated)")
+        timer = threading.Timer(DEMO_CALL_SECONDS, take_call_message, args=(DEMO_CALLER, said))
+        timer.daemon = True
+        timer.start()
+        return {"ok": True}
+
+    @app.post("/api/demo/press/{digit}")
+    def demo_press(digit: str, request: Request):
+        """Rehearse the parent pressing 1 (or 2) on the call that is ringing."""
+        require_rehearsal(request)
+        ringing = next((i for i in engine.store.list_items(limit=50) if i.status == "calling"), None)
+        if ringing is None or digit not in ("1", "2"):
+            return JSONResponse({"ok": False, "detail": "No simulated call is ringing right now."}, 409)
+        if needs_page(ringing, digit):
+            engine.store.add_event("call", "You pressed 1, but forms are approved on the page. Still waiting there",
+                                   ringing.id)
+            return JSONResponse({"ok": False, "detail": "Forms are approved on the page, not on a call."}, 409)
+        if not engine.resume(ringing.id, digit == "1", "call"):
+            return JSONResponse({"ok": False, "detail": "This message is not waiting for you any more."}, 409)
+        return {"ok": True, "item_id": ringing.id}
+
     @app.post("/api/demo/{index}")
     def demo(index: int, request: Request):
         require(request)
@@ -393,8 +436,27 @@ def create_app(engine: Engine) -> FastAPI:
         now = time.time()
         for sid in [s for s, v in pending_calls.items() if now - v[2] > 600]:
             pending_calls.pop(sid, None)
-        pending_calls[str(form.get("CallSid", ""))] = (caller, said, now)
+        sid = str(form.get("CallSid", ""))
+        pending_calls[sid] = (caller, said, now)
+        # "Otherwise you can hang up": Twilio sends nothing more when they do, so pass the message on
+        # ourselves if neither the keypress nor the hang-up notice has arrived by then.
+        timer = threading.Timer(PENDING_CALL_SECONDS, pass_on, args=(sid,))
+        timer.daemon = True
+        timer.start()
         return await xml(inbound_check_emergency_twiml(settings))
+
+    def pass_on(sid: str) -> None:
+        """File a caller's message that is still waiting for "press 1 if this is an emergency"."""
+        pending = pending_calls.pop(sid, None)
+        if pending is not None:
+            take_call_message(pending[0], pending[1])
+
+    @app.post("/twilio/inbound/ended")
+    async def twilio_inbound_ended(request: Request):
+        """Twilio says a call to Hushbell's number ended: don't lose what the caller said."""
+        form = await twilio_ok(request)
+        await run_in_threadpool(pass_on, str(form.get("CallSid", "")))
+        return Response(status_code=204)
 
     @app.post("/twilio/inbound/emergency")
     async def twilio_inbound_emergency(request: Request):

@@ -148,6 +148,7 @@ Android.
 | Claude is down | The safety rule still marks the fever urgent; other rows say "Claude unreachable · kept for you". |
 | Wi-Fi | Use the hotspot from the start. |
 | Everything is down | `hushbell run --no-phone --dry-run --demo`, drive keys 1–6 (0 starts over), approve the fever on the app. Then the backup video. |
+| Twilio isn't working yet and you want to rehearse | Add `--simulate-calls` to a `--demo` run with no Twilio in `.env`: key **C** plays "the nurse calls" and **P** plays "press 1". The screens say "simulated": never show this to judges as the real call. |
 
 ## Questions judges will ask
 

@@ -26,6 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--no-phone", action="store_true", help="don't read the phone (use the page's demo buttons or `hushbell send`)")
     run.add_argument("--dry-run", action="store_true", help="never act on the phone; only log what would happen")
     run.add_argument("--demo", action="store_true", help="show demo message buttons on the page")
+    run.add_argument("--simulate-calls", action="store_true",
+                     help="rehearsal: with --demo and no Twilio, show the call on screen (no phone rings)")
     run.add_argument("--host")
     run.add_argument("--port", type=int)
 
@@ -58,10 +60,18 @@ def main(argv: list[str] | None = None) -> int:
         from pathlib import Path
 
         from hushbell.setup_wizard import run_wizard
-        return run_wizard(Path(args.file))
+        try:
+            if sys.stdin.isatty():
+                return run_wizard(Path(args.file))
+            # Answers piped in from a script: hidden typing needs a real keyboard, so read plain lines.
+            return run_wizard(Path(args.file), ask_secret=input)
+        except (EOFError, KeyboardInterrupt):     # Ctrl+C, or no keyboard to ask (a script, a closed terminal)
+            print(f"\nStopped. Every answer so far is saved in {args.file}. Run `hushbell init` again to go on.")
+            return 1
     settings = Settings.from_env(args.env)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    for noisy in ("httpx", "httpx2", "httpcore"):     # one line per Claude call would bury the useful ones
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     if args.command == "run":
         return cmd_run(settings, args)
@@ -101,6 +111,8 @@ def cmd_run(settings: Settings, args) -> int:
         settings.phone_backend = "dry-run"
     if args.demo:
         settings.demo_mode = True
+    if args.simulate_calls:
+        settings.simulate_calls = True
     if args.host:
         settings.host = args.host
     if args.port:
@@ -142,7 +154,12 @@ def cmd_run(settings: Settings, args) -> int:
     print(f"  Page:   http://localhost:{settings.port}   (on your phone: {on_phone}, or press 'Open on your phone')")
     print(f"  Token:  {settings.access_token}")
     print(f"  Sort:   {'Claude (' + settings.model + ')' if has_key else 'safety rules only: no Claude key yet (run `hushbell init`)'}")
-    print(f"  Calls:  {'on' if settings.calls_enabled else 'off (set TWILIO_* and HUSHBELL_PARENT_PHONE)'}"
+    calls = ("on" if settings.calls_enabled
+             else "SIMULATED for rehearsal: no phone will ring (keys C and P on the big screen)"
+             if engine.simulated_calls else "off (set TWILIO_* and HUSHBELL_PARENT_PHONE)")
+    if settings.simulate_calls and not engine.simulated_calls:
+        print("  --simulate-calls is ignored: it needs --demo, and Twilio not set up (real calls win).")
+    print(f"  Calls:  {calls}"
           f"{' | voice: ElevenLabs' if settings.elevenlabs_api_key and settings.calls_enabled else ''}")
     if inbound_note:
         print(f"          {inbound_note}")
@@ -395,10 +412,18 @@ def _check_notifications(settings: Settings) -> int:
 
 def cmd_notifications(settings: Settings, raw: bool = False) -> int:
     from hushbell.ingest.adb import AdbNotificationSource, parse_dumpsys, to_message
+    if settings.cloud_phone:
+        print("`hushbell notifications` reads an Android plugged into this laptop. In cloud-phone mode, "
+              "run `hushbell doctor --live` to check the cloud phone instead.")
+        return 1
+    if not shutil.which(settings.adb_path):
+        print(f"adb not found ('{settings.adb_path}'). Install Android platform-tools and add adb to PATH, "
+              "or set HUSHBELL_ADB to its full path. `hushbell doctor` checks the rest.")
+        return 1
     try:
         output = AdbNotificationSource(settings).read_raw()
     except Exception as exc:  # noqa: BLE001
-        print(f"Could not read the phone: {exc}")
+        print(f"Could not read the phone: {exc}. Is it plugged in, with USB debugging on? Run `hushbell doctor`.")
         return 1
     if raw:
         sys.stdout.write(output)
@@ -422,11 +447,25 @@ def cmd_send(settings: Settings, args) -> int:
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            print(resp.read().decode())
-        return 0
-    except urllib.error.URLError as exc:
-        print(f"Could not reach Hushbell on port {settings.port}: {exc}. Is `hushbell run` going?")
+            answer = json.loads(resp.read().decode() or "{}")
+    except urllib.error.HTTPError as exc:     # Hushbell answered, so "is it running?" would be the wrong hint
+        if exc.code == 401:
+            print(f"Hushbell on port {settings.port} didn't accept the access token. Run `hushbell send` from the "
+                  "same folder (and with the same HUSHBELL_DATA_DIR) as `hushbell run`.")
+        else:
+            print(f"Hushbell on port {settings.port} refused the message (HTTP {exc.code}). "
+                  "The text can be up to 4000 characters, and the app and sender can't be empty.")
         return 1
+    except (urllib.error.URLError, OSError) as exc:
+        print(f"Could not reach Hushbell on port {settings.port}: {getattr(exc, 'reason', exc)}. "
+              "Is `hushbell run` going?")
+        return 1
+    if answer.get("new"):
+        print(f"Sent. Hushbell is sorting it now (message {answer.get('item_id')}).")
+    else:
+        print("Hushbell saw the same words in the last 12 hours, so it joined them to the earlier message "
+              f"({answer.get('item_id')}). `hushbell reset` starts over.")
+    return 0
 
 
 if __name__ == "__main__":

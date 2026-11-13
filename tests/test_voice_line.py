@@ -122,7 +122,9 @@ def test_twilio_number_is_pointed_at_hushbell(settings):
             self.incoming_phone_numbers = Numbers(found)
 
     assert configure_inbound(settings, client=Client()) == "Calls to +15550000000 now reach Hushbell."
-    assert updates == [{"voice_url": "https://hushbell.example/twilio/inbound", "voice_method": "POST"}]
+    assert updates == [{"voice_url": "https://hushbell.example/twilio/inbound", "voice_method": "POST",
+                        "status_callback": "https://hushbell.example/twilio/inbound/ended",
+                        "status_callback_method": "POST"}]
     assert "Couldn't find" in configure_inbound(settings, client=Client(found=False))
 
 

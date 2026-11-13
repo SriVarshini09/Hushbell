@@ -112,10 +112,13 @@ def build_steps(item: Item, decision: Decision, settings: Settings, rule_labels:
                 pickup_at += timedelta(days=1)          # "by 1:30am", said late in the evening
             leave = pickup_at - timedelta(minutes=max(0, settings.travel_minutes))
             if now < leave < now + timedelta(hours=12):
+                at = spoken_time(leave.hour, leave.minute)
+                # A cloud phone's alarm would ring in the cloud, so there Hushbell calls the parent instead.
+                label, say = ((f"Call you at {at} when it's time to leave", f"call you at {at} when it's time to leave")
+                              if settings.cloud_phone else
+                              (f"Set an alarm for {at} to leave", f"set an alarm for {at}"))
                 steps.append({"id": "alarm", "type": "set_alarm", "time": leave.strftime("%H:%M"),
-                              "message": f"Leave now to pick up {who}",
-                              "label": f"Set an alarm for {spoken_time(leave.hour, leave.minute)} to leave",
-                              "say": f"set an alarm for {spoken_time(leave.hour, leave.minute)}"})
+                              "message": f"Leave now to pick up {who}", "label": label, "say": say})
         # 3. Tell the other parent.
         if settings.partner_name and valid_phone(settings.partner_phone):
             if pickup:

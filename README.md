@@ -211,6 +211,12 @@ or rings the parent, and one row per message: what arrived, what Hushbell decide
 ticking off as it is done. In `--demo` mode, keys **1–6** send the example messages and **0**
 starts over (press **?** to see the keys).
 
+**Rehearsing the call without Twilio.** `hushbell run --no-phone --dry-run --demo --simulate-calls`
+simulates the call so you can practise the big-screen moments: press **C** for "the school nurse
+calls Hushbell" and **P** for "press 1" (the parent's page has the same two buttons in its demo
+box). No phone rings, and every screen that shows the call says "simulated". Once Twilio is set
+up, the flag is ignored and calls are real.
+
 Other commands: `hushbell notifications` (what the phone shows and what Hushbell would read;
 `--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`, and
 `hushbell reset` (clear all messages to start over; in demo mode the page has a **Start over**
@@ -234,7 +240,7 @@ All settings are environment variables; `.env.example` lists them. The main ones
 | `HUSHBELL_EXTRA_URGENT_WORDS` | More words that should always ring you (e.g. `head lice`) |
 | `HUSHBELL_SCHOOL_ADDRESS`, `HUSHBELL_TRAVEL_MINUTES` | Directions to school, and how early the "time to leave" alarm goes off (default 30 min) |
 | `HUSHBELL_PARTNER_NAME`, `HUSHBELL_PARTNER_PHONE` | A co-parent Hushbell can text in an emergency, after your OK |
-| `HUSHBELL_PHONE_BACKEND` | `mobilerun` (default) or `dry-run` |
+| `HUSHBELL_PHONE_BACKEND` | `mobilerun` (default), `phoneuse` (a PhoneUse cloud phone) or `dry-run` |
 | `TWILIO_*`, `HUSHBELL_PARENT_PHONE`, `HUSHBELL_PUBLIC_URL` | Calls through Do Not Disturb |
 | `HUSHBELL_DIGEST_TIME` | When the evening digest is written (default `18:00`) |
 | `HUSHBELL_ACCESS_TOKEN` | Token for the page; created for you if empty (`hushbell token`) |
@@ -294,8 +300,12 @@ hushbell/
   phone.py          Mobilerun actions (and a dry-run backend)
   store.py          SQLite storage and the activity log
   web/              the page and the Twilio webhooks
+scripts/
+  fake_phoneuse.py  a pretend PhoneUse for rehearsing cloud-phone mode on your own computer
 tests/
 ```
+
+To rehearse cloud-phone mode without a PhoneUse account, run `python scripts/fake_phoneuse.py` (it needs `pip install pillow`); the top of that file has the three commands.
 
 The 2-minute demo script and judge Q&A are in [`docs/demo-script.md`](docs/demo-script.md).
 

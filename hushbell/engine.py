@@ -28,7 +28,9 @@ from hushbell.models import (
     STATUS_NEW, STATUS_SKIPPED, STATUS_SORTING, STATUS_WAITING, Decision, IncomingMessage, Item,
 )
 from hushbell.phone import PhoneBackend, UnsafeAction
-from hushbell.plan import PICKUP_LABELS, build_steps, parse_date, parse_time, spoken_list
+from hushbell.plan import (
+    CALL_APP, PICKUP_LABELS, build_steps, parse_date, parse_time, pretty_phone, spoken_list, spoken_time,
+)
 from hushbell.store import Store
 from hushbell.tracing import enabled as tracing_enabled
 from hushbell.triage.dedupe import WINDOW_SECONDS, find_duplicate
@@ -100,7 +102,8 @@ class Engine:
                 return item, False
             item = self.store.create_item(msg.app, msg.sender, msg.text)
             self.store.add_message(item.id, msg.app, msg.package, msg.sender, msg.text, msg.source)
-            self.store.add_event("received", f"{msg.app} · {msg.sender}: {_short(msg.text)}", item.id)
+            who = pretty_phone(msg.sender) if msg.app == CALL_APP else msg.sender
+            self.store.add_event("received", f"{msg.app} · {who}: {_short(msg.text)}", item.id)
         self.executor.submit(self._run, item.id, {"item_id": item.id})
         return item, True
 
@@ -130,14 +133,21 @@ class Engine:
             # On the call, Twilio connects the parent to the caller straight away (see web/app.py).
             item = self.store.get_item(item_id)
             if any(s["type"] == "call_back" for s in item.steps):
-                steps = [dict(s, status="done", detail="Connected you to them on the call.")
+                detail = ("Rehearsal: on a real call you would be connected to them now."
+                          if self.simulated_calls else "Connected you to them on the call.")
+                steps = [dict(s, status="done", detail=detail)
                          if s["type"] == "call_back" and s.get("enabled", True) else s for s in item.steps]
                 self.store.update_item(item_id, steps=steps)
-        verb = "approved" if approved else "said they will handle it"
+        verb = "approved" if approved else "said you'll handle it"
         how = "on the call" if via == "call" else "on the Hushbell page"
-        self.store.add_event("answer", f"Parent {verb} {how}", item_id)
+        self.store.add_event("answer", f"You {verb} {how}", item_id)
         self.executor.submit(self._run, item_id, Command(resume={"approved": approved, "via": via}))
         return True
+
+    @property
+    def simulated_calls(self) -> bool:
+        """True in a rehearsal (`--demo --simulate-calls`, no Twilio): calls show on screen, but no phone rings."""
+        return bool(getattr(self.voice, "simulated", False))
 
     def call_status(self, item_id: str, status: str) -> None:
         """Twilio's final call status. Redial once if the call was missed."""
@@ -271,6 +281,7 @@ class Engine:
             },
             "setup": {
                 "calls": self.settings.calls_enabled,
+                "calls_simulated": self.simulated_calls,
                 "phone_actions": getattr(self.phone, "name", "unknown"),
                 "reading_phone": self.settings.read_phone,
                 "phone_health": self.health.get("phone", "off"),
@@ -309,6 +320,8 @@ class Engine:
                 "title": i.event_title or i.summary or i.text, "child": i.child, "category": i.category,
                 "calendar_step": calendar["id"] if calendar else "",
                 "on_calendar": bool(calendar and calendar.get("status") == "done"),
+                # Cloud-phone mode can't reach the parent's calendar: it makes a link for them to tap.
+                "link": calendar.get("link", "") if calendar and calendar.get("status") == "done" else "",
                 "can_add": bool(calendar) and i.status in {STATUS_LATER, STATUS_DONE, STATUS_SKIPPED}
                            and calendar.get("status") != "done",
             })
@@ -440,8 +453,11 @@ class Engine:
                                  item.id)
             return
         self.store.update_item(item.id, status=STATUS_CALLING, call_attempts=item.call_attempts + 1)
-        self.store.add_event("calling", f"Calling {_mask(self.settings.parent_phone)} through Do Not Disturb",
-                             item.id)
+        if self.simulated_calls:
+            self.store.add_event("calling", "Rehearsal: a simulated call. No phone is ringing", item.id)
+        else:
+            self.store.add_event("calling", f"Calling {_mask(self.settings.parent_phone)} through Do Not Disturb",
+                                 item.id)
 
     def _prepare(self, item: Item) -> None:
         try:
@@ -479,7 +495,8 @@ class Engine:
         item = self.store.get_item(item_id)
         steps = [dict(s) for s in item.steps]
         todo = [s for s in steps if s.get("enabled", True) and s.get("status") != "done"]
-        self.store.add_event("acting", f"Working on your phone: {spoken_list(todo)}", item.id)
+        where = "the cloud phone" if self.settings.cloud_phone else "your phone"
+        self.store.add_event("acting", f"Working on {where}: {spoken_list(todo)}", item.id)
         failures: list[str] = []
         for step in todo:
             ok, detail = self._do_step(self.store.get_item(item_id), step)
@@ -490,8 +507,11 @@ class Engine:
                 failures.append(detail.rstrip("."))
         finished = [s["detail"] for s in steps if s.get("status") == "done" and s.get("detail")]
         if failures:
-            self.store.update_item(item_id, status=STATUS_FAILED,
-                                   result=". ".join(failures) + ". Check the phone, then press Try again.")
+            # Say each reason once, and add what to do next unless the reason already says it.
+            why = ". ".join(dict.fromkeys(failures)) + "."
+            if "Try again" not in why:
+                why += f" Check {'the cloud phone' if self.settings.cloud_phone else 'the phone'}, then press Try again."
+            self.store.update_item(item_id, status=STATUS_FAILED, result=why)
         else:
             self.store.update_item(item_id, status=STATUS_DONE, result=" ".join(finished) or "Done.")
 
@@ -529,7 +549,7 @@ class Engine:
     def _node_file_later(self, state: FlowState) -> FlowState:
         item = self._item(state)
         self.store.update_item(item.id, status=STATUS_LATER)
-        self.store.add_event("later", f"Saved for the {self.settings.digest_time} digest", item.id)
+        self.store.add_event("later", f"Saved for the {_clock(self.settings.digest_time)} digest", item.id)
         return {}
 
     def _item(self, state: FlowState) -> Item:
@@ -552,6 +572,12 @@ def _to_do(steps: list[dict]) -> list[dict]:
 def _short(text: str, n: int = 90) -> str:
     text = " ".join(text.split())
     return text if len(text) <= n else text[: n - 1] + "…"
+
+
+def _clock(hhmm: str) -> str:
+    """"18:00" as a parent would say it: "6 PM" (the same words the big screen uses)."""
+    clock = parse_time(hhmm)
+    return spoken_time(*clock) if clock else hhmm
 
 
 def _mask(number: str) -> str:

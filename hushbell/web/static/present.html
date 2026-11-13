@@ -11,7 +11,7 @@
 :root{
   /* Projector view. One row per school message, read left to right: what arrived, what Hushbell
      decided, what it did. The call to the parent is the big moment, so it gets the banner. */
-  --paper:#0B111D;--ink:#EEF2F8;--muted:#9AA6BC;--faint:#6B7891;--line:#243049;--card:#131B2C;--soft:#1C2740;
+  --paper:#0B111D;--ink:#EEF2F8;--muted:#9AA6BC;--faint:#8290AB;--line:#243049;--card:#131B2C;--soft:#1C2740;
   --bell:#F4B400;--urgent:#F26D69;--needs:#6FA0F5;--later:#8E98AD;--ok:#4CC28A;
   color-scheme:dark
 }
@@ -35,6 +35,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .tools{display:flex;gap:.35rem;margin-right:.6rem}
 .tools span{font-size:.72rem;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:.1rem .55rem}
 .dot{width:.6rem;height:.6rem;border-radius:50%;background:var(--ok)}
+.dot.lost{background:var(--urgent)}
 
 /* Do Not Disturb strip with the story in four numbers */
 .dnd{display:flex;align-items:center;gap:1.4rem;background:linear-gradient(90deg,#16203A,#121A2C);border:1px solid var(--line);
@@ -69,6 +70,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .chips{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center}
 .chips small{color:var(--muted);font-size:.9rem;margin-right:.15rem}
 .chip{font-size:.88rem;font-weight:700;padding:.2rem .65rem;border-radius:999px;background:rgba(255,255,255,.1);color:var(--ink)}
+/* A rehearsal's simulated call must never pass for a real one. */
+.banner>div:nth-child(2){flex:1;min-width:0}
+.sim{flex:none;align-self:flex-start;font-size:.85rem;font-weight:800;letter-spacing:.04em;color:#14203A;background:#fff;border-radius:.45rem;padding:.25rem .65rem}
+.tools span.simulated{color:#14203A;background:#fff;border-color:#fff}
 
 /* Rows */
 .cols,.row{display:grid;grid-template-columns:1.05fr .85fr 1.3fr;gap:1.1rem}
@@ -89,7 +94,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .merged{font-size:.75rem;font-weight:800;color:var(--bell);border:1px solid #5A4A12;border-radius:.4rem;padding:.08rem .45rem}
 .text{margin-top:.35rem;font-size:1.08rem;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pill{display:inline-block;font-size:.85rem;font-weight:850;letter-spacing:.06em;border-radius:.45rem;padding:.18rem .6rem}
-.pill.urgent{background:var(--urgent);color:#fff} .pill.needs_you{background:var(--needs);color:#0B111D}
+.pill.urgent{background:var(--urgent);color:#0B111D} .pill.needs_you{background:var(--needs);color:#0B111D}
 .pill.later{background:var(--soft);color:var(--ink)}
 .how{display:inline-block;margin-left:.4rem;font-size:.78rem;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:.4rem;padding:.12rem .45rem}
 .how.rule{color:var(--bell);border-color:#5A4A12}
@@ -109,7 +114,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
 .mark{flex:none;width:1.3rem;height:1.3rem;margin-top:.08rem;border-radius:50%;display:grid;place-items:center;font-size:.8rem;font-weight:900}
 .mark.planned{border:2px solid var(--faint)}
 .mark.done{background:var(--ok);color:#0B111D}
-.mark.failed{background:var(--urgent);color:#fff}
+.mark.failed{background:var(--urgent);color:#0B111D}
 .mark.skipped{color:var(--faint)}
 .mark.working{border:2px solid var(--soft);border-top-color:var(--needs);animation:spin .8s linear infinite}
 .mark.pop{animation:pop .5s ease-out}
@@ -159,7 +164,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
       <span class="bell"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>HUSHBELL</span>
       <span class="tag">Hushed all day. Rings when your kid needs you.</span>
     </div>
-    <div class="live"><span class="tools" id="tools"></span><span class="dot" aria-hidden="true"></span><span id="clock">Live</span> · <a href="/">parent's page</a></div>
+    <div class="live"><span class="tools" id="tools"></span><span class="dot" id="dot" aria-hidden="true"></span><span id="clock">Live</span> · <a href="/">parent's page</a></div>
   </header>
 
   <section class="dnd" aria-label="The parent's phone">
@@ -181,7 +186,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   <div id="rows"></div>
   <div class="ticker" id="ticker"></div>
 </div>
-<div class="keys" id="keys" hidden>Demo keys: <b>1–6</b> send a demo message · <b>0</b> start over · <b>F</b> full screen · <b>?</b> hide</div>
+<div class="keys" id="keys" hidden>Demo keys: <b>1–6</b> send a demo message<span id="simKeys" hidden> · <b>C</b> the school nurse calls (simulated) · <b>P</b> press 1 on the call (simulated)</span> · <b>0</b> start over · <b>F</b> full screen · <b>?</b> hide</div>
 
 <script>
 (() => {
@@ -197,11 +202,13 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   const OPEN = new Set(["calling", "waiting", "approved", "acting"]);
   const STAGGER = 550;                     // ms between ticks, so the room can follow each step
 
-  let last = null, first = true, lastShown = 0, timer = null;
+  let last = null, first = true, lastShown = 0, timer = null, misses = 0;
   const revealAt = {};                     // "item:step" -> when its finished mark may show
   const popped = new Set();                // marks that already played their animation
   const prevNums = {};
 
+  // A caller's number, the way a person writes it: +14155550134 -> (415) 555-0134.
+  const sender = it => it.app === "Phone call" ? String(it.sender).replace(/^\+1(\d{3})(\d{3})(\d{4})$/, "($1) $2-$3") : it.sender;
   const appBadge = app => `<span class="app"><i style="background:${APP_COLOR[app] || "var(--muted)"}"></i>${esc(app)}</span>`;
   const parentName = s => s.setup.parent_name ? s.setup.parent_name[0].toUpperCase() + s.setup.parent_name.slice(1) : "";
   const digestAt = hhmm => { const [h, m] = (hhmm || "18:00").split(":").map(Number);
@@ -210,7 +217,8 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   function chipFor(st) {
     if (st.type === "call_back") return "Connect to the caller";
     if (st.type === "reply") return st.label.replace(/ in .*$/, "");
-    if (st.type === "set_alarm") return st.label.replace(/^Set an alarm for /, "Alarm ").replace(/ to leave$/, "");
+    if (st.type === "set_alarm") return st.label.replace(/^Set an alarm for /, "Alarm ").replace(/ to leave$/, "")
+      .replace(/^Call you at (.+?) when.*$/, "Reminder call $1");
     if (st.type === "text_partner") return `Text ${st.name || "your partner"}`;
     if (st.type === "directions") return "Directions";
     if (st.type === "add_calendar") return "Add to calendar";
@@ -256,7 +264,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     const steps = it.steps || [];
     const allShown = steps.every(st => !["done", "failed"].includes(st.status) || now >= (revealAt[it.id + ":" + st.id] || 0));
     switch (it.status) {
-      case "calling": return `<span class="state calling">Ringing ${esc(who)} through Do Not Disturb</span>`;
+      case "calling": return `<span class="state calling">${s.setup.calls_simulated ? "Simulated call to " + esc(who) : "Ringing " + esc(who) + " through Do Not Disturb"}</span>`;
       case "waiting": return `<span class="state">Waiting for ${esc(who)}'s OK</span>`;
       case "approved": case "acting": return '<span class="state working">Working on the phone…</span>';
       case "done": return allShown ? '<span class="state done">Done</span>' : '<span class="state working">Working on the phone…</span>';
@@ -282,7 +290,7 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   function arrivedHtml(it) {
     const sources = it.sources && it.sources.length > 1 ? it.sources : [it.app];
     const merged = sources.length > 1 ? `<span class="merged">${sources.length} messages → 1</span>` : "";
-    return `<div class="src">${sources.map(appBadge).join("")}${merged}<span>${esc(it.sender)} · ${time(it.created_at)}</span></div>
+    return `<div class="src">${sources.map(appBadge).join("")}${merged}<span>${esc(sender(it))} · ${time(it.created_at)}</span></div>
       <div class="text">${esc(it.text)}</div>`;
   }
 
@@ -339,10 +347,11 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   function bannerFor(s) {
     const who = parentName(s) || "the parent";
     const serverNow = s.now || Date.now() / 1000;
+    const sim = s.setup.calls_simulated ? "Rehearsal · simulated call · no phone is ringing" : "";
     const calling = s.items.find(i => i.status === "calling");
     if (calling) {
       const todo = (calling.steps || []).filter(st => st.enabled !== false && st.status !== "done");
-      return {key: "ring:" + calling.id, cls: "ring", icon: PHONE,
+      return {key: "ring:" + calling.id, cls: "ring", icon: PHONE, sim,
         title: `Ringing ${who} through Do Not Disturb`,
         text: calling.summary || calling.text,
         chips: todo.length ? `<small>Press 1 to</small>${todo.map(st => `<span class="chip">${esc(chipFor(st))}</span>`).join("")}` : ""};
@@ -353,24 +362,24 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
       const yes = /approved/.test(answered.detail);
       const connect = it && (it.steps || []).some(st => st.type === "call_back" && st.enabled !== false);
       const n = it ? (it.steps || []).filter(st => st.enabled !== false && st.type !== "call_back").length : 0;
-      return {key: "ans:" + answered.id, cls: "answered", icon: CHECK,
+      return {key: "ans:" + answered.id, cls: "answered", icon: CHECK, sim,
         title: yes ? `${who} pressed 1` : `${who} will handle it`,
-        text: yes ? (connect ? `Connecting ${who} to the caller now${n ? ` · Hushbell is doing the other ${n}` : ""}`
+        text: yes ? (connect ? `Connecting ${who} to the caller now${n ? ` · Hushbell is doing the other ${n === 1 ? "step" : n}` : ""}`
                              : `Hushbell is doing it now on ${who}'s phone`) : "Nothing else will be done for this one.",
         chips: ""};
     }
     const incoming = s.events.find(e => e.kind === "incoming call" && serverNow - e.at < 40);
     if (incoming && !s.items.some(i => i.app === "Phone call" && i.created_at >= incoming.at - 1)) {
-      return {key: "in:" + incoming.id, cls: "incoming", icon: PHONE,
+      return {key: "in:" + incoming.id, cls: "incoming", icon: PHONE, sim: / \(simulated\)$/.test(incoming.detail) ? sim : "",
         title: "Hushbell answered a call",
-        text: incoming.detail.replace(/^Hushbell answered a call /, "").replace(/^from /, "From ") + " · listening to what they say",
+        text: incoming.detail.replace(/ \(simulated\)$/, "").replace(/^Hushbell answered a call /, "").replace(/^from /, "From ") + " · listening to what they say",
         chips: ""};
     }
     const waiting = s.items.find(i => i.status === "waiting" && i.category === "urgent");
     if (waiting) {
       return {key: "wait:" + waiting.id, cls: "waiting", icon: ALERT,
         title: `Urgent · waiting for ${who}`,
-        text: (waiting.summary || waiting.text) + (s.setup.calls ? "" : " · Calls are off in this run, so it's at the top of the parent's page."),
+        text: (waiting.summary || waiting.text) + (s.setup.calls || s.setup.calls_simulated ? "" : " · Calls are off in this run, so it's at the top of the parent's page."),
         chips: ""};
     }
     return null;
@@ -379,11 +388,12 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
   let bannerKey = "";
   function renderBanner(s) {
     const b = bannerFor(s);
-    const key = b ? b.key + "|" + b.title + "|" + b.text + "|" + b.chips : "";
+    const key = b ? b.key + "|" + b.title + "|" + b.text + "|" + b.chips + "|" + (b.sim || "") : "";
     if (key === bannerKey) return;
     bannerKey = key;
     $("banner").innerHTML = b ? `<div class="banner ${b.cls}"><div class="icon">${b.icon}</div>
-      <div><h2>${esc(b.title)}</h2><p>${esc(b.text)}</p>${b.chips ? `<div class="chips">${b.chips}</div>` : ""}</div></div>` : "";
+      <div><h2>${esc(b.title)}</h2><p>${esc(b.text)}</p>${b.chips ? `<div class="chips">${b.chips}</div>` : ""}</div>
+      ${b.sim ? `<span class="sim">${esc(b.sim)}</span>` : ""}</div>` : "";
   }
 
   // ---------------------------------------------------------------- numbers and ticker
@@ -406,7 +416,9 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
       : "Do Not Disturb is on. Hushbell is not.";
     const tools = ["Claude", "LangGraph", st.cloud_phone && "PhoneUse", st.voice, st.web_search && "Tavily",
       st.tracing && "LangSmith", st.hosted].filter(Boolean);
-    const toolsHtml = tools.map(t => `<span>${esc(t)}</span>`).join("");
+    const toolsHtml = tools.map(t => `<span>${esc(t)}</span>`).join("")
+      + (st.calls_simulated ? '<span class="simulated">Calls simulated</span>' : "");
+    $("simKeys").hidden = !st.calls_simulated;
     if ($("tools")._html !== toolsHtml) { $("tools").innerHTML = toolsHtml; $("tools")._html = toolsHtml; }
     renderBanner(s);
 
@@ -448,10 +460,16 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     try {
       const r = await fetch("/api/state", {credentials: "same-origin"});
       if (r.status === 401) { location.href = "/"; return; }
+      if (!r.ok) throw new Error("HTTP " + r.status);
       last = await r.json();
       render(last, Date.now());
-    } catch (e) { /* try again next tick */ }
-    $("clock").textContent = "Live · " + new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+      misses = 0;
+    } catch (e) { misses++; }    // try again next tick
+    // After about 4 seconds without an answer, stop saying "Live".
+    const lost = misses >= 4;
+    $("dot").classList.toggle("lost", lost);
+    $("clock").textContent = lost ? "Reconnecting to Hushbell…"
+      : "Live · " + new Date().toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
   }
 
   // Presenter keys for a demo run (only when Hushbell was started with --demo).
@@ -463,9 +481,12 @@ header{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     }
     if (!last || !last.setup.demo) return;
     if (e.key === "?") { $("keys").hidden = !$("keys").hidden; return; }
-    const post = url => fetch(url, {method: "POST", credentials: "same-origin"}).then(refresh);
+    if (e.repeat) return;                    // a held key must not send the same thing twice
+    const post = url => fetch(url, {method: "POST", credentials: "same-origin"}).then(refresh, () => {});
     if (/^[1-6]$/.test(e.key)) post(`/api/demo/${Number(e.key) - 1}`);
     else if (e.key === "0") post("/api/demo/reset");
+    else if (last.setup.calls_simulated && /^c$/i.test(e.key)) post("/api/demo/call");
+    else if (last.setup.calls_simulated && /^p$/i.test(e.key)) post("/api/demo/press/1");
   });
   window.addEventListener("resize", () => last && render(last, Date.now()));
 

@@ -31,6 +31,12 @@ def _list(value: str | None) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
+def _name(value: str | None) -> str:
+    """A name as typed, except that "eli" becomes "Eli": it is shown on screen and said on calls."""
+    value = (value or "").strip()
+    return value[:1].upper() + value[1:] if value.islower() else value
+
+
 def _bool(value: str | None, default: bool) -> bool:
     if value is None or value == "":
         return default
@@ -121,6 +127,7 @@ class Settings:
     host: str = "0.0.0.0"
     port: int = 8000
     demo_mode: bool = False
+    simulate_calls: bool = False     # rehearsal only: with demo_mode and no Twilio, show calls on screen; nothing rings
 
     # Digest
     digest_time: str = "18:00"
@@ -174,12 +181,12 @@ class Settings:
             access_token=token,
             model=env("HUSHBELL_MODEL") or "claude-opus-5-5",
             effort=env("HUSHBELL_EFFORT") or "low",
-            children=_list(env("HUSHBELL_CHILDREN")),
-            parent_name=env("HUSHBELL_PARENT_NAME") or "",
+            children=[_name(child) for child in _list(env("HUSHBELL_CHILDREN"))],
+            parent_name=_name(env("HUSHBELL_PARENT_NAME")),
             schools=_list(env("HUSHBELL_SCHOOLS")),
             school_address=env("HUSHBELL_SCHOOL_ADDRESS") or "",
             travel_minutes=int(env("HUSHBELL_TRAVEL_MINUTES") or 30),
-            partner_name=env("HUSHBELL_PARTNER_NAME") or "",
+            partner_name=_name(env("HUSHBELL_PARTNER_NAME")),
             partner_phone=env("HUSHBELL_PARTNER_PHONE") or "",
             adb_path=env("HUSHBELL_ADB") or find_adb(),
             adb_serial=env("HUSHBELL_ADB_SERIAL") or None,
@@ -220,6 +227,7 @@ class Settings:
             host=env("HUSHBELL_HOST") or "0.0.0.0",
             port=int(env("HUSHBELL_PORT") or 8000),
             demo_mode=_bool(env("HUSHBELL_DEMO"), False),
+            simulate_calls=_bool(env("HUSHBELL_SIMULATE_CALLS"), False),
             digest_time=env("HUSHBELL_DIGEST_TIME") or "18:00",
         )
 

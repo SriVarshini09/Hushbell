@@ -86,6 +86,24 @@ class TwilioVoice:
         return call.sid
 
 
+class SimulatedVoice:
+    """Rehearsal only: `hushbell run --demo --simulate-calls` with no Twilio set up.
+
+    It pretends to ring the parent, so a team can practise the big-screen call moments (ringing,
+    press 1, connected) before Twilio exists. No phone rings and nothing is sent, and every screen
+    that shows the call says it is simulated.
+    """
+
+    simulated = True
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def place_call(self, item_id: str) -> str:
+        self.calls.append(item_id)
+        return f"SIM{len(self.calls)}"
+
+
 def ring_test_twiml() -> str:
     from twilio.twiml.voice_response import VoiceResponse
 
@@ -112,7 +130,10 @@ def configure_inbound(settings: Settings, client=None) -> str:
         found = client.incoming_phone_numbers.list(phone_number=settings.twilio_from_number, limit=1)
         if not found:
             return f"Couldn't find {settings.twilio_from_number} on your Twilio account, so incoming calls aren't set up."
-        found[0].update(voice_url=f"{settings.public_base_url}/twilio/inbound", voice_method="POST")
+        # The status callback tells Hushbell when a caller hangs up, so a message is never left half-taken.
+        found[0].update(voice_url=f"{settings.public_base_url}/twilio/inbound", voice_method="POST",
+                        status_callback=f"{settings.public_base_url}/twilio/inbound/ended",
+                        status_callback_method="POST")
         return f"Calls to {settings.twilio_from_number} now reach Hushbell."
     except Exception as exc:  # noqa: BLE001 - start-up must not fail over this
         return f"Couldn't set up incoming calls on Twilio: {str(exc)[:160]}"
@@ -121,7 +142,12 @@ def configure_inbound(settings: Settings, client=None) -> str:
 # ---- incoming calls ---------------------------------------------------------------------
 
 def for_voice(text: str) -> str:
-    """Make a written answer sound right when read aloud."""
+    """Make a written answer sound right when read aloud: no bullets, no bold marks, no web addresses."""
+    import re
+
+    text = re.sub(r"https?://[^\s)]+", lambda m: "the link on your Hushbell page"
+                  + (m.group()[-1] if m.group()[-1] in ".,;:!?" else ""), text)
+    text = re.sub(r"[*_#`]+", "", text)
     lines = [ln.strip().lstrip("-•* ").strip() for ln in text.splitlines() if ln.strip()]
     return " ".join(ln if ln.endswith((".", "!", "?")) else ln + "." for ln in lines)
 
@@ -195,7 +221,15 @@ def parent_ask_twiml(settings: Settings, answer: str | None = None) -> str:
 
 
 def make_voice(settings: Settings) -> Voice | None:
-    return TwilioVoice(settings) if settings.calls_enabled else None
+    if settings.calls_enabled:
+        return TwilioVoice(settings)
+    return SimulatedVoice() if settings.demo_mode and settings.simulate_calls else None
+
+
+def _sentence(text: str) -> str:
+    """The text as one spoken sentence: a reply that ends "…on my way." must not be read as "way.."."""
+    text = text.strip()
+    return text if text.endswith((".", "!", "?")) else text + "."
 
 
 def _option_text(item: Item) -> str:
@@ -205,11 +239,11 @@ def _option_text(item: Item) -> str:
         pass  # forms are handled below: the page only
     elif item.steps and spoken_list(item.steps):
         has_reply = any(s["type"] == "reply" for s in item.steps)
-        reply = f" Your reply will say: {item.reply_text}." if has_reply and item.reply_text else ""
+        reply = f" Your reply will say: {_sentence(item.reply_text)}" if has_reply and item.reply_text else ""
         return (f"Press 1 and I will {spoken_list(item.steps)}.{reply} "
                 "Press 2 if you will handle it yourself.")
     if item.action_type == "reply" and item.reply_text:
-        return f"Press 1 to reply: {item.reply_text}. Press 2 if you will handle it yourself."
+        return f"Press 1 to reply: {_sentence(item.reply_text)} Press 2 if you will handle it yourself."
     if item.action_type == "open_link":
         # A form link can't be checked by ear, so it is approved on the page, where the link is visible.
         return ("It comes with a form. Open your Hushbell page to see the link and approve it. "

@@ -169,7 +169,8 @@ class DryRunPhone:
         check_step(step)
         self.steps.append(step)
         log.info("[dry run] would %s", describe_step(step))
-        return ActionResult(True, f"Dry run: would {describe_step(step)}.")
+        what = describe_step(step)
+        return ActionResult(True, f"Dry run: would {what}" + ("" if what.endswith((".", ".”")) else "."))
 
 
 class MobilerunPhone:
