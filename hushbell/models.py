@@ -109,6 +109,7 @@ class Item:
             "result": self.result,
             "sources": self.sources,
             "duplicate_count": self.duplicate_count,
+            "call_attempts": self.call_attempts,
             "steps": self.steps,
             "event_date": self.event_date,
             "event_time": self.event_time,

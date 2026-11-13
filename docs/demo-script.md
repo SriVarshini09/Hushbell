@@ -6,7 +6,7 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 
 | What | Set-up |
 |---|---|
-| **Projector** | The laptop showing **http://localhost:8000/present** (the big-screen view). Optionally the parent's phone mirrored next to it with `scrcpy`. |
+| **Projector** | The laptop showing **http://localhost:8000/present** (the big-screen view), full screen with **F**. Optionally the parent's phone mirrored next to it with `scrcpy`. |
 | **Your phone** (the parent's) | Do Not Disturb **on**. Hushbell's Twilio number saved as "Hushbell" and starred. Hushbell page open on it. |
 | **Android with the school apps** | Plugged into the laptop, screen awake, Remind signed in as a parent. (If your own phone is Android, it's the same phone.) |
 | **Teacher phone** | A teammate's phone with the Remind teacher account. Hand it to **judge 1**. |
@@ -26,13 +26,13 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 
 | Time | Say and do | What the room sees on the big screen |
 |---|---|---|
-| 0:00 | "Parents juggle up to 15 school apps. The Boston Globe says many have stopped reading them. Buried in there is 'your kid has a fever.' And when the school nurse calls, it's from a number you don't know, on Do Not Disturb." | The empty presenter view: "the parent's phone is on Do Not Disturb" |
-| 0:15 | **Judge 1** (teacher phone) sends two Remind messages: "Bake sale Friday, bring cookies" and "Field trip next Friday, permission form due today: (link)". | Two rows appear: bake sale → LATER, field trip → NEEDS YOU, with its plan: fill the form, add the trip to the calendar |
-| 0:35 | **Judge 2** calls Hushbell's number: *"Hi, this is the school nurse at Lincoln. Anna has a fever. Can someone pick her up by 3?"* Hushbell answers on their speaker. | A "Phone call" row: URGENT, "Safety words: fever · no AI needed" |
-| 0:50 | **Your phone rings**, on Do Not Disturb. Answer on speaker: Hushbell explains and offers "Press 1 and I will connect you to them, set an alarm, text Sam, and open directions." **Press 1.** | The steps tick ✓ one by one. Judge 2's phone rings: they're talking to you. Sam's phone gets the text |
+| 0:00 | "Parents juggle up to 15 school apps. The Boston Globe says many have stopped reading them. Buried in there is 'your kid has a fever.' And when the school nurse calls, it's from a number you don't know, on Do Not Disturb." | "All quiet." The moon: "Eli's phone · Do Not Disturb is on. Hushbell is not." |
+| 0:15 | **Judge 1** (teacher phone) sends two Remind messages: "Bake sale next Friday, cookie donations welcome" and "Field trip next Friday, permission form due today: (link)". | Two rows slide in, "Reading it…" then: bake sale → LATER, field trip → NEEDS YOU, each "Sorted by Claude", with its plan: fill the form, add the trip to the calendar |
+| 0:35 | **Judge 2** calls Hushbell's number: *"Hi, this is the school nurse at Lincoln. Anna has a fever. Can someone pick her up by 3?"* Hushbell answers on their speaker. | Blue banner: "Hushbell answered a call · listening". Then a "Phone call" row: URGENT, "Safety rule · before any AI" |
+| 0:50 | **Your phone rings**, on Do Not Disturb. Answer on speaker: Hushbell explains and offers "Press 1 and I will connect you to them, set an alarm, text Sam, and open directions." **Press 1.** | Yellow ringing banner: "Ringing Eli through Do Not Disturb · Press 1 to …". Then green: "Eli pressed 1". The steps tick ✓ one by one. Judge 2's phone rings: they're talking to you. Sam's phone gets the text |
 | 1:25 | "At lunch I check once." On your phone, tap **Do these 2** on the field trip card. | The form gets filled and the trip lands on the calendar |
 | 1:40 | Optional: call Hushbell from your own phone and ask *"What do I need to do this week?"* | Hushbell reads out the week |
-| 1:50 | "A text, a call, and a form. One phone call to me, one tap, and I never opened a school app. Hushbell is open source and runs on my own phone and laptop." | The counters; the repo link |
+| 1:50 | "Three messages and a phone call. My phone rang once, I pressed one key and tapped once, and I never opened a school app. Hushbell is open source and runs on my own phone and laptop." | The four numbers: school messages → rang through → things done on the phone → taps by Eli |
 
 ## Likely questions
 
@@ -61,4 +61,4 @@ For the Do Not Disturb Hackathon. Theme: "Your phone is on Do Not Disturb. Your 
 | Your phone doesn't ring | Approve on the page instead: "the call is the shortcut, the page is the fallback" |
 | A step shows ✗ on the big screen | Press **Try again**, or move on: "every step is logged, and it only retries what didn't finish" |
 | Venue Wi-Fi is down | Switch the laptop to the phone hotspot and restart ngrok, then Hushbell |
-| Everything is down | Play the backup video, and show the page in `--dry-run --demo` mode |
+| Everything is down | Play the backup video, or run `hushbell run --no-phone --dry-run --demo` and drive the big screen with keys **1–6** (0 starts over). With calls off, the fever row shows a red "Urgent · waiting for Eli" banner; approve it on the phone page and the steps tick off |

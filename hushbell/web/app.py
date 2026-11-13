@@ -46,7 +46,7 @@ def demo_messages(children: list[str]) -> list[dict]:
     child = child[:1].upper() + child[1:]
     teacher = "Ms. Rivera · Room 12"
     return [
-        {"app": "Remind", "sender": teacher, "text": "Bake sale Friday! Bring cookies."},
+        {"app": "Remind", "sender": teacher, "text": "Bake sale next Friday! Cookie donations welcome."},
         {"app": "Remind", "sender": teacher,
          "text": "Field trip to the science museum next Friday! Permission form due TODAY: "
                  "https://forms.gle/fieldtrip12"},

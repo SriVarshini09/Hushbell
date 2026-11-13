@@ -126,6 +126,17 @@ def test_twilio_number_is_pointed_at_hushbell(settings):
     assert "Couldn't find" in configure_inbound(settings, client=Client(found=False))
 
 
+def test_the_big_screen_gets_names_and_call_counts(make_engine, settings):
+    voice = FakeVoice()
+    engine, client = _client(make_engine, settings, voice)
+    settings.partner_name = "Sam"
+    said = "This is the school nurse. Maya has a fever and needs to be picked up."
+    client.post("/twilio/inbound/heard", data={"From": NURSE, "CallSid": "CA9", "SpeechResult": said})
+    state = client.get("/api/state", headers=AUTH).json()
+    assert state["setup"]["parent_name"] == "Eli" and state["setup"]["partner_name"] == "Sam"
+    assert state["items"][0]["call_attempts"] == 1 and state["now"] > 0
+
+
 def test_presenter_view_needs_sign_in(make_engine):
     client = TestClient(create_app(make_engine()))
     assert "Access token" in client.get("/present").text

@@ -14,14 +14,16 @@
 }
 @media (prefers-color-scheme:dark){:root{
   --paper:#0F1522;--ink:#E8ECF4;--muted:#9AA5BA;--line:#2A3448;--card:#171F30;--soft:#1F2840;
-  --urgent:#F07470;--needs:#76A3F2;--later:#9AA3B5;--ok:#4CC28A;color-scheme:dark}}
+  --urgent:#F07470;--needs:#76A3F2;--later:#9AA3B5;--ok:#4CC28A;--on-needs:#0F1522;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:720px;margin:0 auto;padding:16px 16px 48px}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px}
-.bell{background:var(--bell);color:#14203A;font-weight:800;letter-spacing:.08em;padding:6px 10px;border-radius:8px;font-size:14px}
+.bell{display:flex;align-items:center;gap:6px;background:var(--bell);color:#14203A;font-weight:800;letter-spacing:.08em;padding:6px 10px;border-radius:8px;font-size:14px}
+.bell svg{width:15px;height:15px;fill:#14203A}
 .tag{color:var(--muted);font-size:13px}
+@media (max-width:520px){.tag{display:none}}
 .setup{display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--card)}
 .chip.on::before{content:"● ";color:var(--ok)}
@@ -30,23 +32,34 @@ header{display:flex;align-items:center;justify-content:space-between;gap:12px;fl
 button.mini{font-size:12px;padding:3px 10px;border-radius:999px}
 .notice{margin:0 0 10px;font-size:13px;color:var(--urgent)}
 .notice.ok{color:var(--ok)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0 6px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
-.stat b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 6px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:9px 12px}
+.stat b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
 .stat span{font-size:12px;color:var(--muted)}
+.stat.alert b{color:var(--urgent)}
+@media (max-width:480px){.stat{padding:8px 9px;border-radius:12px}.stat b{font-size:21px}.stat span{font-size:11px;line-height:1.25;display:block}}
 h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px}
+h2 .count[hidden]{display:none}
+h2 .count{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--needs);color:var(--on-needs,#fff);font-size:11px;text-align:center;letter-spacing:0}
 .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--needs);border-radius:14px;padding:14px;margin-bottom:10px}
 .card.urgent{border-left-color:var(--urgent)}
 .card.later{border-left-color:var(--later)}
 .card.done{border-left-color:var(--ok)}
+.ringing{display:flex;align-items:center;gap:10px;margin:-4px 0 10px;padding:8px 10px;border-radius:10px;background:var(--bell);color:#14203A;font-weight:700;font-size:13.5px}
+.ringing svg{width:18px;height:18px;fill:#14203A;flex:none}
+@media (prefers-reduced-motion:no-preference){.ringing svg{animation:shake 1.6s ease-in-out infinite}}
+@keyframes shake{0%,50%,100%{transform:rotate(0)}10%,30%{transform:rotate(-14deg)}20%,40%{transform:rotate(14deg)}}
 .meta{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pill{font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:2px 7px;background:var(--soft)}
 .pill.urgent{background:var(--urgent);color:#fff}
-.pill.needs_you{background:var(--needs);color:#fff}
+.pill.needs_you{background:var(--needs);color:var(--on-needs,#fff)}
 .pill.calling{background:var(--bell);color:#14203A}
+.pill.done{background:var(--ok);color:#fff}
 .summary{font-weight:650;margin:6px 0 4px;font-size:15.5px}
 .reason{font-size:13.5px;color:var(--muted)}
-.original{margin-top:8px;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.reason b{font-weight:600;color:var(--ink)}
+.original{margin-top:8px;font-size:13px;color:var(--muted);overflow-wrap:anywhere;border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.original b{font-weight:600}
 .plan{margin-top:10px;background:var(--soft);border-radius:10px;padding:10px 12px}
 .plan-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .step{display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:14px;overflow-wrap:anywhere}
@@ -58,11 +71,16 @@ h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 .step textarea:focus-visible,.ask input:focus-visible,.step input:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 button{font:inherit;font-weight:700;border-radius:10px;padding:9px 14px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
-button.primary{background:var(--needs);border-color:var(--needs);color:#fff}
+button.primary{background:var(--needs);border-color:var(--needs);color:var(--on-needs,#fff)}
 button.small{font-size:12.5px;padding:5px 10px;border-radius:8px}
 button:disabled{opacity:.5;cursor:default}
 button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .empty{color:var(--muted);font-size:14px;background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:14px}
+.quiet{display:flex;align-items:center;gap:12px}
+.quiet .moon{width:38px;height:38px;border-radius:50%;background:var(--soft);display:grid;place-items:center;flex:none}
+.quiet .moon svg{width:20px;height:20px;fill:var(--needs)}
+.quiet b{display:block;color:var(--ink)}
+.more{margin-top:8px}
 .row{display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
 .row:last-child{border-bottom:0}
 .row .when{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px}
@@ -82,6 +100,9 @@ button:focus-visible{outline:3px solid var(--bell);outline-offset:2px}
 .answer{margin-top:10px;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--bell);border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px}
 .suggest{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .demo{display:flex;gap:8px;flex-wrap:wrap}
+#demoBox{margin-top:26px;border:1px dashed var(--line);border-radius:14px;padding:4px 14px 14px}
+#demoBox h2{margin-top:10px}
+#demoBox p{margin:0 0 10px;font-size:12.5px;color:var(--muted)}
 footer{margin-top:28px;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12.5px;gap:10px;flex-wrap:wrap}
 @media (max-width:480px){.stats{grid-template-columns:repeat(2,1fr)}}
 @media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
@@ -90,33 +111,20 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
 <body>
 <div class="wrap">
   <header>
-    <div class="brand"><span class="bell">HUSHBELL</span><span class="tag">Hushed all day. Rings when your kid needs you.</span></div>
+    <div class="brand"><span class="bell"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6v-5a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>HUSHBELL</span><span class="tag">Hushed all day. Rings when your kid needs you.</span></div>
     <div class="setup" id="setup"></div>
   </header>
 
   <div class="stats" id="stats">
     <div class="stat"><b id="sMsgs">0</b><span>school messages today</span></div>
-    <div class="stat"><b id="sUrgent">0</b><span>urgent today</span></div>
+    <div class="stat" id="sUrgentBox"><b id="sUrgent">0</b><span>urgent today</span></div>
     <div class="stat"><b id="sNeeds">0</b><span>waiting for you</span></div>
     <div class="stat"><b id="sDone">0</b><span>done for you</span></div>
   </div>
 
-  <h2>Needs you</h2>
+  <h2>Needs you<span class="count" id="needsCount" hidden></span></h2>
   <div id="notice"></div>
   <div id="needs"></div>
-
-  <section id="demoBox" hidden>
-    <h2>Demo messages</h2>
-    <div class="demo">
-      <button type="button" data-demo="0">Bake sale</button>
-      <button type="button" data-demo="1">Field trip form</button>
-      <button type="button" data-demo="2">WhatsApp repost</button>
-      <button type="button" data-demo="3">Chess club question</button>
-      <button type="button" data-demo="4">Picture day</button>
-      <button type="button" data-demo="5">Fever</button>
-      <button type="button" data-reset="1">Start over</button>
-    </div>
-  </section>
 
   <h2>Coming up</h2>
   <div id="coming"></div>
@@ -142,6 +150,21 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
 
   <h2>Activity</h2>
   <div class="list" id="events"></div>
+  <button type="button" class="small more" id="moreEvents" hidden></button>
+
+  <section id="demoBox" hidden>
+    <h2>Demo messages</h2>
+    <p>Only shown when Hushbell runs with <code>--demo</code>. On the big screen, keys 1–6 send these and 0 starts over.</p>
+    <div class="demo">
+      <button type="button" data-demo="0">Bake sale</button>
+      <button type="button" data-demo="1">Field trip form</button>
+      <button type="button" data-demo="2">WhatsApp repost</button>
+      <button type="button" data-demo="3">Chess club question</button>
+      <button type="button" data-demo="4">Picture day</button>
+      <button type="button" data-demo="5">Fever</button>
+      <button type="button" data-reset="1">Start over</button>
+    </div>
+  </section>
 
   <footer>
     <span>Runs on your own laptop and phone. Nothing is sent, signed or paid without your OK.
@@ -175,7 +198,8 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
       let extra = "";
       if (st.type === "reply") {
         const value = drafts[it.id] ?? it.reply_text;
-        extra = `<textarea class="reply" data-reply-for="${esc(it.id)}" maxlength="300" rows="2" aria-label="Reply text">${esc(value)}</textarea>`;
+        const rows = Math.min(6, Math.max(2, Math.ceil(String(value || "").length / 34) + 1));
+        extra = `<textarea class="reply" data-reply-for="${esc(it.id)}" maxlength="300" rows="${rows}" aria-label="Reply text">${esc(value)}</textarea>`;
       } else if (st.type === "open_link") {
         extra = `<span class="detail">${esc(it.url)}${it.instructions ? " · " + esc(it.instructions) : ""}</span>`;
       }
@@ -202,14 +226,20 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     return `Do these ${n}`;
   }
 
+  const PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>';
+  const MOON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  let showAllEvents = false;
+
   function needsCard(it) {
     const calling = it.status === "calling";
+    const why = it.rule_hit ? `<b>Safety words:</b> ${esc(it.rule_hit)} (caught before any AI)` : `<b>Why:</b> ${esc(it.reason)}`;
     return `<article class="card ${it.category === "urgent" ? "urgent" : ""}">
+      ${calling ? `<div class="ringing">${PHONE}Calling you now, through Do Not Disturb. Press 1 on the call, or tap below.</div>` : ""}
       <div class="meta"><span class="pill ${esc(it.category)}">${it.category === "urgent" ? "URGENT" : "NEEDS YOU"}</span>
-        ${calling ? '<span class="pill calling">Calling you now</span>' : ""}<span>${meta(it)}</span></div>
+        <span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
-      <div class="reason">${it.rule_hit ? "Safety words: " + esc(it.rule_hit) : esc(it.reason)}</div>
-      ${(it.summary || "").includes(it.text) ? "" : `<div class="original">Message: ${esc(it.text)}</div>`}
+      <div class="reason">${why}</div>
+      ${(it.summary || "").includes(it.text) ? "" : `<div class="original"><b>${esc(it.app)}:</b> ${esc(it.text)}</div>`}
       ${planForOpen(it)}
       <div class="btns">
         <button type="button" class="primary" data-approve="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>${approveLabel(it)}</button>
@@ -224,7 +254,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   function handledRow(it) {
     const cls = it.status === "done" ? "done" : it.category === "urgent" ? "urgent" : it.category === "later" ? "later" : "";
     return `<article class="card ${cls}">
-      <div class="meta"><span class="pill">${esc(STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
+      <div class="meta"><span class="pill ${it.status === "done" ? "done" : ""}">${esc(STATUS_TEXT[it.status] || it.status)}</span><span>${meta(it)}</span></div>
       <div class="summary">${esc(it.summary || it.text)}</div>
       ${planDone(it)}
       ${it.status === "failed" ? `<div class="reason" style="margin-top:8px">${esc(it.result)}</div><div class="btns"><button type="button" data-retry="${esc(it.id)}" ${busy.has(it.id) ? "disabled" : ""}>Try again</button></div>` : ""}
@@ -260,6 +290,9 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     $("sUrgent").textContent = s.counts.urgent_today;
     $("sNeeds").textContent = s.counts.needs_you;
     $("sDone").textContent = s.counts.done_today;
+    $("sUrgentBox").classList.toggle("alert", s.counts.urgent_today > 0);
+    $("needsCount").hidden = !s.counts.needs_you;
+    $("needsCount").textContent = s.counts.needs_you;
     $("demoBox").hidden = !setup.demo;
     $("laterTitle").textContent = `For tonight's digest (${setup.digest_time})`;
     $("notice").innerHTML = notice ? `<p class="notice ${noticeOk ? "ok" : ""}" role="status">${esc(notice)}</p>` : "";
@@ -269,7 +302,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
     const editing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#needs textarea");
     if (!editing) {
       $("needs").innerHTML = open.length ? open.map(needsCard).join("")
-        : '<div class="empty">Nothing needs you right now. Your phone can stay quiet.</div>';
+        : `<div class="empty quiet"><span class="moon">${MOON}</span><span><b>All quiet.</b>Nothing needs you right now. Your phone can stay on Do Not Disturb.</span></div>`;
     }
 
     $("coming").innerHTML = s.coming_up.length ? `<div class="list">${s.coming_up.map(c => `
@@ -288,9 +321,12 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
       ? `<div class="list">${later.map(i => `<div class="row"><span class="when">${time(i.created_at)}</span><span class="grow">${esc(i.sender)} · ${esc(i.summary || i.text)}</span></div>`).join("")}</div>`
       : '<div class="empty">Nothing saved for later yet.</div>';
 
-    $("events").innerHTML = s.events.length
-      ? s.events.map(e => `<div class="row"><span class="when">${time(e.at)}</span><span class="kind">${esc(e.kind)}</span><span class="grow">${esc(e.detail)}</span></div>`).join("")
+    const events = showAllEvents ? s.events : s.events.slice(0, 8);
+    $("events").innerHTML = events.length
+      ? events.map(e => `<div class="row"><span class="when">${time(e.at)}</span><span class="kind">${esc(e.kind)}</span><span class="grow">${esc(e.detail)}</span></div>`).join("")
       : '<div class="row">No activity yet.</div>';
+    $("moreEvents").hidden = s.events.length <= 8;
+    $("moreEvents").textContent = showAllEvents ? "Show less" : `Show all ${s.events.length}`;
     $("askBtn").disabled = !s.can_ask;
   }
 
@@ -333,6 +369,7 @@ footer{margin-top:28px;display:flex;justify-content:space-between;align-items:ce
   document.addEventListener("click", e => {
     const t = e.target.closest("button");
     if (!t) return;
+    if (t.id === "moreEvents") { showAllEvents = !showAllEvents; refresh(); return; }
     if (t.dataset.approve) {
       const id = t.dataset.approve;
       const box = document.querySelector(`[data-reply-for="${CSS.escape(id)}"]`);

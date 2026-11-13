@@ -159,8 +159,12 @@ hushbell run
 Open the page on the laptop, or on your phone at `http://<laptop IP>:8000` (same Wi-Fi) or at
 your ngrok address. Everything works from a phone: the calls, the approval cards, and the log.
 
-For a demo on a projector, open **http://localhost:8000/present**: one row per message, showing
-what arrived, what Hushbell decided and each step it did, live.
+For a demo on a projector, open **http://localhost:8000/present** and press **F** for full screen.
+It shows the parent's phone on Do Not Disturb with four live numbers (school messages, calls that
+rang through, things done on the phone, taps by the parent), a banner when Hushbell answers a call
+or rings the parent, and one row per message: what arrived, what Hushbell decided and each step,
+ticking off as it is done. In `--demo` mode, keys **1–6** send the example messages and **0**
+starts over (press **?** to see the keys).
 
 Other commands: `hushbell notifications` (what the phone shows and what Hushbell would read;
 `--raw` for bug reports), `hushbell send "text"` (a test message), `hushbell token`, and

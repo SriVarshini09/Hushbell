@@ -51,6 +51,16 @@ def test_no_alarm_when_it_is_already_too_late_or_there_is_no_time(settings):
     assert "set_alarm" not in [s["type"] for s in build_steps(_item(), no_time, _family(settings), ["fever"], now=NOW)]
 
 
+def test_a_pickup_after_midnight_still_gets_its_alarm(settings):
+    evening = datetime(2026, 11, 12, 23, 50)
+    after_midnight = FEVER.model_copy(update={"date": "", "time": "01:30"})
+    steps = build_steps(_item(), after_midnight, _family(settings), ["fever"], now=evening)
+    alarm = next(s for s in steps if s["type"] == "set_alarm")
+    assert alarm["time"] == "01:00"
+    next_week = FEVER.model_copy(update={"date": "2026-11-19"})
+    assert "set_alarm" not in [s["type"] for s in build_steps(_item(), next_week, _family(settings), ["fever"], now=NOW)]
+
+
 def test_extras_only_appear_when_set_up(settings):
     steps = build_steps(_item(), FEVER, settings, ["fever"], now=NOW)       # no partner, no address
     assert [s["type"] for s in steps] == ["reply", "set_alarm"]

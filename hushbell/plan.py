@@ -105,10 +105,13 @@ def build_steps(item: Item, decision: Decision, settings: Settings, rule_labels:
 
     if decision.category == "urgent":
         # 2. A "time to leave" alarm, if the message says when.
-        if pickup and clock and (day is None or day == today):
-            leave = datetime.combine(today, datetime.min.time()).replace(hour=clock[0], minute=clock[1])
-            leave -= timedelta(minutes=max(0, settings.travel_minutes))
-            if leave > now:
+        #    Only for the next 12 hours: the phone's alarm takes a time of day, not a date.
+        if pickup and clock:
+            pickup_at = datetime.combine(day or today, datetime.min.time()).replace(hour=clock[0], minute=clock[1])
+            if day is None and now - pickup_at > timedelta(hours=12):
+                pickup_at += timedelta(days=1)          # "by 1:30am", said late in the evening
+            leave = pickup_at - timedelta(minutes=max(0, settings.travel_minutes))
+            if now < leave < now + timedelta(hours=12):
                 steps.append({"id": "alarm", "type": "set_alarm", "time": leave.strftime("%H:%M"),
                               "message": f"Leave now to pick up {who}",
                               "label": f"Set an alarm for {spoken_time(leave.hour, leave.minute)} to leave",
